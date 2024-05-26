@@ -1,0 +1,56 @@
+---
+title: "Soak Time Map"
+author: "Sydney Collins"
+date: "2024-05-26"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+---
+title: "NAFO Divisions"
+author: "Sydney Collins"
+date: "2023-12-19"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Load Packages and Data}
+library(maps)
+library(ggforce)
+library(RColorBrewer)
+library(viridis)
+library(marmap)
+library(tidyverse)
+library(patchwork)
+library(rgdal)
+library(scales)
+```
+
+```{r}
+Canada <- subset(map_data("world"), map_data("world")$region == "Canada") %>%
+  filter(long > -60, lat > 46) %>%
+  filter(long < -51, lat < 52.3)
+
+NAFO <- fortify(readOGR("C:/Users/Sydney/OneDrive/Desktop/NAFO_Divisions_SHP/NAFO_Divisions_2021_line_enclosed.shp")) %>%
+  filter(long > -60, lat > 46) %>%
+  filter(long < -51, lat < 52.3)
+
+bathy <- fortify(getNOAA.bathy(lon1 = -51, lon2 = -60, lat1 = 52.3, lat2 = 46, resolution = 1, keep = T)) %>%
+  filter(z < 0) %>%
+  rename(Depth = z)
+bathy <- as.bathy(bathy)
+
+jpeg(filename = "figures/Map.jpeg", width = 15, height = 18, units = "cm", res = 600)
+autoplot.bathy(bathy, geom = c("raster")) +
+  scale_fill_gradient2(name = "Depth (m)", low = "dodgerblue4", mid = "gainsboro", high="darkgreen") +
+  geom_polygon(data = NAFO, aes(x = long, y = lat, group = group), colour = "black", fill = NA) +
+  geom_polygon(data = Canada, aes(x = long, y = lat, group = group), fill = "grey50") +
+  annotate("point", cex = 2, y = c(48.086010, 49.447928), x = c(-52.895682, -53.958540), colour = "red") +
+  annotate("text", cex = 2, y = c(48.086010, 49.447928), x = c(-52.3, -53.2), label = c("Bay de Verde", "Musgrave Harbour")) +
+  annotate("text", cex = 3, x = c(-53, -51.8, -55.7), y = c(51, 47.5, 46.5), label = c("3K", "3L", "3Ps")) +
+  theme(panel.background = element_rect(fill = 'white'), legend.key = element_rect(fill = "gainsboro"), text = element_text(size = 12), axis.title=element_blank())
+dev.off()
+
+```
