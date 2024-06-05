@@ -3,20 +3,28 @@ title: "Soak Time and Duration"
 author: "Jessika Lamarre, Robert Blackmore, Sydney Collins"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r Load packages and Data}
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+
 #Setting up main datasets
 main.data <- read.csv("data/Main_herring_2024_Catch_Bycatch.csv")
-morpho.data<- read.csv("Bycatch_2024_Herring_Sampling.csv")
+
+morpho.data <- read.csv("data/Bycatch_2024_Herring_Sampling.csv") %>%
+  drop_na(Sample_herring_FK_cm)
 
 #Subset
-sum.data<-subset(main.data, main.data$Net_group=="Sum")#sum of both nets
+sum.data <- subset(main.data, main.data$Net_group=="Sum")#sum of both nets
+```
 
-morpho.data<-subset(morpho.data, morpho.data$Sample_herring_FK_cm!="")#removes NAs
-########################################################################################################
+```{r Summary Stats}
 #Herring catch vs soak duration/time
-sum.data$Total_target_catch_kg<-as.numeric(sum.data$Total_target_catch_kg)
+sum.data$Total_target_catch_kg <- as.numeric(sum.data$Total_target_catch_kg)
 sum.data$Total_target_catch_number<-as.numeric(sum.data$Total_target_catch_number)
 sum.data$NOGA_presence<-as.numeric(sum.data$NOGA_presence)
 
