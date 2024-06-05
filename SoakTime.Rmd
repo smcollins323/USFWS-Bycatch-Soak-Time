@@ -1,7 +1,15 @@
+---
+title: "Soak Time and Duration"
+author: "Jessika Lamarre, Robert Blackmore, Sydney Collins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Load packages and Data}
 #Setting up main datasets
 main.data <- read.csv("data/Main_herring_2024_Catch_Bycatch.csv")
 morpho.data<- read.csv("Bycatch_2024_Herring_Sampling.csv")
-########################################################################################################
+
 #Subset
 sum.data<-subset(main.data, main.data$Net_group=="Sum")#sum of both nets
 
@@ -210,4 +218,7 @@ stat.test <- stat.test %>% add_xy_position(x = "Year")
 
 (aov1|aov2)  +
   plot_layout(guides = "collect") & theme(legend.position = 'right')
+
+
+```
 
