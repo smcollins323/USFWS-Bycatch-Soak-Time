@@ -1,5 +1,5 @@
 #Setting up main datasets
-main.data<- read_csv("Main_herring_2024_Catch_Bycatch.csv")
+main.data<- read_csv("Bycatch_2024_Catch_Bycatch.csv")
 morpho.data<- read_csv("Bycatch_2024_Herring_Sampling.csv")
 ########################################################################################################
 #Subset
@@ -7,7 +7,6 @@ sum.data<-subset(main.data, main.data$Net_group=="Sum")#sum of both nets
 
 morpho.data<-subset(morpho.data, morpho.data$Sample_herring_FK_cm!="")#removes NAs
 ########################################################################################################
-
 #Herring catch vs soak duration/time
 sum.data$Total_target_catch_kg<-as.numeric(sum.data$Total_target_catch_kg)
 sum.data$Total_target_catch_number<-as.numeric(sum.data$Total_target_catch_number)
@@ -211,3 +210,4 @@ stat.test <- stat.test %>% add_xy_position(x = "Year")
 
 (aov1|aov2)  +
   plot_layout(guides = "collect") & theme(legend.position = 'right')
+
