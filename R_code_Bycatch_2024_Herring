@@ -1,5 +1,5 @@
 #Setting up main datasets
-main.data<- read_csv("Bycatch_2024_Catch_Bycatch.csv")
+main.data<- read_csv("Main_herring_2024_Catch_Bycatch.csv")
 morpho.data<- read_csv("Bycatch_2024_Herring_Sampling.csv")
 ########################################################################################################
 #Subset
