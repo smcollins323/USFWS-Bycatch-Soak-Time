@@ -17,13 +17,71 @@ library(glmmTMB)
 library(lubridate)
 library(data.table)
 library(doBy)
+library(ggeffects)
+library(FactoMineR)
+library(factoextra)
+library(viridis)
 
 #Setting up main datasets
-metadata <- read.csv("data/Soak_time_metadata_2024.csv")
+metadata <- read.csv("data/Soak_time_metadata_2024.csv", na.strings = "") %>%
+  mutate(CloudCover = as.factor(ifelse(Prevailing_weather_cond.1 %like% "cloudy" | Prevailing_weather_cond.1 %like% "Cloudy" | Prevailing_weather_cond.1 %like% "overcast" | Prevailing_weather_cond.1 %like% "Overcast" | Prevailing_weather_cond.1 %like% "Rain", "Cloudy",ifelse(Prevailing_weather_cond.1 %like% "clear" | Prevailing_weather_cond.1 %like% "no cloud" | Prevailing_weather_cond.1 %like% "Clear" | Prevailing_weather_cond.1 %like% "sunny" | Prevailing_weather_cond.1 %like% "Sunny", "Clear",ifelse(Prevailing_weather_cond.1 == "Unknown", NA, "Cloudy"))))) %>%
+  mutate(Fog = as.factor(ifelse(Prevailing_weather_cond.1 %like% "fog" == TRUE | Prevailing_weather_cond.1 %like% "Fog" == TRUE, "Fog", "NoFog"))) %>%
+  mutate(Rain = as.factor(ifelse(Prevailing_weather_cond.1 %like% "rain" | Prevailing_weather_cond.1 %like% "Rain", "Rain", "NoRain"))) %>%
+  mutate(OceanCond = as.factor(ifelse(Prevailing_weather_cond.1 %like% "calm" | Prevailing_weather_cond.1 %like% "Calm", "Calm", ifelse(Prevailing_weather_cond.1 %like% "rough" | Prevailing_weather_cond.1 %like% "choppy" | Prevailing_weather_cond.1 %like% "lop" | Prevailing_weather_cond.1 %like% "swell", "Rough", NA)))) %>%
+  mutate(SST_Celcius = gsub("Unknown", NA, SST_Celcius)) %>%
+  mutate(Wind_speed.1 = as.numeric(gsub("Unknown", NA, Wind_speed.1))) %>%
+  mutate(Wind_direction.1 = gsub("Unknown", NA, Wind_direction.1)) %>%
+  mutate(Wind = as.factor(ifelse(Wind_speed.1 < 12, "LowWind", "Windy"))) %>%
+  drop_na(Observers, Wind)
+```
 
+```{r Weather MCA}
+#look at the proportional occurrence of each behaviour
+summary(metadata[c(27:31)])
+#does vocalizations fit with these categories?
+vars <- metadata %>% select(27:31)
+
+#Calculate the MCA
+mca <- MCA(vars, graph = FALSE)
+
+#Variance described by each axis
+get_eigenvalue(mca)
+fviz_screeplot(mca, addlabels = TRUE, ylim = c(0, 45))
+
+#Visualize dimensions and where points lie
+fviz_mca_var(mca, choice = "mca.cor", repel = TRUE, ggtheme = theme_minimal())
+fviz_mca_biplot(mca, repel = TRUE, ggtheme = theme_minimal())
+
+#Variable Loadings
+var <- get_mca_var(mca)
+var$coord
+var$contrib
+jpeg(filename = "figures/MCA_plot.jpeg", width = 16, height = 16, units = "cm", res = 300)
+fviz_mca_var(mca, repel = TRUE, col.var = "black", ggtheme = theme_classic())
+dev.off()
+
+#Quality of representation in 2 dimensions
+var$cos2
+fviz_mca_var(mca, col.var = "cos2", gradient.cols = c("red", "#E7B800", "darkgreen"), repel = TRUE, ggtheme = theme_minimal())
+    #Most variables are well represented
+
+#Individual Values
+ind <- get_mca_ind(mca)
+ind$coord
+metadata$Weather <- ind$coord[,1]
+
+
+#Histogram of weather scores
+ggplot() +
+  ylab("Frequency") +
+  xlab("Weather Score (Dim1)") +
+  geom_histogram(data = metadata, aes(x = Weather), fill = "grey", colour = "black") +
+  theme_classic()
+```
+
+```{r Load Rest of Data}
 main.data <- read.csv("data/Main_herring_2024_Catch_Bycatch.csv") %>%
-  left_join(metadata %>% dplyr::select(Trip_ID, Prevailing_weather_cond.1))
-
+  left_join(metadata %>% dplyr::select(Trip_ID, Weather))
 
 morpho.data <- read.csv("data/Herring_morphometrics_2024.csv") %>%
   drop_na()
@@ -53,7 +111,8 @@ sum.data <- subset(main.data, main.data$Net_group=="Sum") %>% #sum of both nets
   mutate(Net_treatment = factor(Net_treatment, levels = c("24hr", "12_night", "12_day"))) %>%
   mutate(Birds = rowSums(.[22:39])) %>%
   mutate(BirdTime = ifelse((as.ITime(Time_pulling) < 43200) == TRUE, "Morning", "Afternoon")) %>%
-  mutate(weather = ifelse(Prevailing_weather_cond.1 %like% "fog" == TRUE | Prevailing_weather_cond.1 %like% "Fog" == TRUE, "fog", "NOfog"))
+  mutate(Port = gsub("Baie_de_Verde", "Bay de Verde", Port)) %>%
+  mutate(Port = gsub("Musgrave_Harbour", "Musgrave Harbour", Port))
 ```
 
 ```{r Summary Stats}
@@ -70,61 +129,100 @@ summary(as.factor(sum.data$Net_treatment))
 
 aggregate(sum.data$Total_target_catch_number, list(sum.data$Net_treatment), FUN=mean)
 aggregate(sum.data$Total_target_catch_number, list(sum.data$Net_treatment), FUN=sd)
+
+#Sample sizes and summary of treatments
+summaryBy(Soak_duration ~ Net_treatment, data = sum.data %>% drop_na(Soak_duration), FUN = c(length, mean, sd, min, max))
 ```
 
 ```{r Catch Model}
 #Check assumptions ANOVA for Catch weight
-jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 11, units = "cm", res = 300)
+jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
+  scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey") +
+  geom_jitter(aes(colour = Port)) +
   labs(x = "Net Treatment", y = bquote("Catch Weight" ~(kg/m^2))) +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
-  theme_classic()
+  theme_classic() +
+  theme(legend.position = "top")
 dev.off()
 
 #Create the model
-mod <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + yDate, data = sum.data,
+mod <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + yDate + I(yDate^2), data = sum.data,
                family = gaussian(link = "identity"))
-simulateResiduals(mod, plot = T) #looks good!
-summary(mod)
+sim1 <- simulateResiduals(mod, plot = T) #looks meh!
+plotResiduals(sim1, form = sum.data$Net_treatment)
+plotResiduals(sim1, form = sum.data$Port)
+plotResiduals(sim1, form = sum.data$yDate)
 Anova(mod)
 
+#TODO make a table output of mod
+
 #Post-hoc test
-emmeans(mod, "Net_treatment")
-pairs(emmeans(mod, "Net_treatment"))
+emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
 ```
 
-```{r Bycatch Model}
-sum.data.na <- sum.data %>% drop_na(Soak_duration)
+```{r Bycatch Model - Soak Time}
+#First look at the relationship with the categorical variable
+cat_mod <- glmmTMB(bycatch_sum ~ Net_treatment + yDate + Port + 
+                     Total_target_catch_kg, data = sum.data, 
+                   family = poisson(link = "log"))
+simulateResiduals(cat_mod, plot = T)
+summary(cat_mod)
+Anova(cat_mod)
+
+#Next look at the relationship with just soak time
 
 #logistic regression
-logit_bycatchmod <- glmmTMB(bycatch ~ Soak_duration + yDate + Port, data = sum.data,
+logit_bycatchmod <- glmmTMB(bycatch ~ Soak_duration + yDate + Port + scaled_weight, data = sum.data,
                             family = binomial(link = "logit"))
 sim2 <- simulateResiduals(logit_bycatchmod, plot = T)
 testZeroInflation(sim2)
 summary(logit_bycatchmod)
 
 library(brglm)
-brglm_bycatch <- brglm(bycatch ~ Soak_duration + yDate + Port + Total_target_catch_kg, data = sum.data,
+brglm_bycatch <- brglm(bycatch ~ Soak_duration + yDate + Port + scaled_weight, data = sum.data,
                        family = binomial)
 simulateResiduals(brglm_bycatch, plot = T)
 summary(brglm_bycatch)
 
 #poisson regression
-bycatchmod <- glmmTMB(bycatch_sum ~ Soak_duration + Port + yDate, data = sum.data, 
-                      family = poisson(link = "log"), ziformula = ~ Soak_duration)
+bycatchmod <- glmmTMB(bycatch_sum ~ Soak_duration + yDate + Port + Total_target_catch_kg, data = sum.data, 
+                      family = poisson(link = "log"))
+performance::check_collinearity(bycatchmod)
 sim3 <- simulateResiduals(bycatchmod, plot = T)
 testZeroInflation(sim3)
 plotResiduals(sim3, sum.data.na$Soak_duration)
 plotResiduals(sim3, sum.data.na$Port)
 plotResiduals(sim3, sum.data.na$yDate)
 summary(bycatchmod)
+
+plot(sum.data$Soak_duration ~ sum.data$bycatch_sum)
+
+bycatchmod2 <- glmmTMB(I(bycatch_sum/Net_area_m2) ~ Soak_duration + Port + scaled_weight, data = sum.data, 
+                      family = nbinom2(link = "log"))
+performance::check_collinearity(bycatchmod2)
+sim4 <- simulateResiduals(bycatchmod2, plot = T)
+testZeroInflation(sim4)
+plotResiduals(sim3, sum.data.na$Soak_duration)
+plotResiduals(sim3, sum.data.na$Port)
+plotResiduals(sim3, sum.data.na$yDate)
+summary(bycatchmod2)
+
+jpeg(filename = "figures/Bycatch_Odds.jpeg", width = 16, height = 10, units = "cm", res = 300)
+ggplot(ggpredict(brglm_bycatch, terms = "Soak_duration [all]"), aes(x, predicted)) +
+  labs(y = "Odds of Bycatch", x = "Soak Duration (h)")+
+  geom_point() +
+  geom_line() +
+  ylim(0, 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1) +
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'), 
+        axis.title = element_text(size = 12), axis.text = element_text(size = 10))
+dev.off()
 ```
 
 ```{r Bird Occurrence Model}
-boxplot(Birds ~ BirdTime, data = sum.data)
-
-jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 11, units = "cm", res = 300)
+jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(data = sum.data, aes(x = BirdTime, y = Birds)) +
   geom_boxplot(fill = "lightgrey") +
   xlab("Set/Haul Time") +
@@ -132,18 +230,20 @@ ggplot(data = sum.data, aes(x = BirdTime, y = Birds)) +
   theme_classic()
 dev.off()
 
-birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + yDate + weather + scaled_weight, data = sum.data, 
-                   family = nbinom2(link = "log")) #not sure whether to include scaled_weight
-birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + weather, data = sum.data, 
+birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather + scaled_weight, data = sum.data %>% drop_na(Weather), family = nbinom2(link = "log")) #not sure whether to include scaled_weight
+birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather, data = sum.data %>% drop_na(Weather), 
                    family = nbinom2(link = "log"))
-birdmod3 <- glmmTMB(Birds ~ BirdTime + Port + yDate + scaled_weight, data = sum.data, 
-                   family = nbinom2(link = "log"))
-birdmod4 <- glmmTMB(Birds ~ BirdTime + Port + yDate, data = sum.data, 
+birdmod3 <- glmmTMB(Birds ~ BirdTime + Port + yDate + scaled_weight, 
+                    data = sum.data %>% drop_na(Weather), 
+                    family = nbinom2(link = "log"))
+birdmod4 <- glmmTMB(Birds ~ BirdTime + Port + yDate, data = sum.data %>% drop_na(Weather), 
                    family = nbinom2(link = "log"))
 #need to figure out a weather variable
+
 anova(birdmod1, birdmod2, birdmod3, birdmod4)
 anova(birdmod2, birdmod3, birdmod4)
+anova(birdmod2, birdmod4)
 anova(birdmod3, birdmod4)
-simulateResiduals(birdmod3, plot = T)
-summary(birdmod3)
+simulateResiduals(birdmod1, plot = T)
+summary(birdmod1)
 ```
