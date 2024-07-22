@@ -8,6 +8,7 @@ editor_options:
 ---
 
 ```{r Load packages and Data}
+rm(list = ls())
 library(tidyverse)
 library(rstatix)
 library(ggpubr)
@@ -22,14 +23,21 @@ library(FactoMineR)
 library(factoextra)
 library(viridis)
 library(patchwork)
+library(brglm)
 
 #Setting up main datasets
-metadata <- read.csv("data/Soak_time_metadata_2024.csv", na.strings = "") %>%
+metadata <- read.csv("data/Main_herring_fishery_2024 - Metadata.csv", na.strings = "") %>%
+  
   mutate(CloudCover = as.factor(ifelse(Prevailing_weather_cond.1 %like% "cloudy" | Prevailing_weather_cond.1 %like% "Cloudy" | Prevailing_weather_cond.1 %like% "overcast" | Prevailing_weather_cond.1 %like% "Overcast" | Prevailing_weather_cond.1 %like% "Rain", "Cloudy",ifelse(Prevailing_weather_cond.1 %like% "clear" | Prevailing_weather_cond.1 %like% "no cloud" | Prevailing_weather_cond.1 %like% "Clear" | Prevailing_weather_cond.1 %like% "sunny" | Prevailing_weather_cond.1 %like% "Sunny", "Clear",ifelse(Prevailing_weather_cond.1 == "Unknown", NA, "Cloudy"))))) %>%
+  
   mutate(Fog = as.factor(ifelse(Prevailing_weather_cond.1 %like% "fog" == TRUE | Prevailing_weather_cond.1 %like% "Fog" == TRUE, "Fog", "NoFog"))) %>%
+  
   mutate(Rain = as.factor(ifelse(Prevailing_weather_cond.1 %like% "rain" | Prevailing_weather_cond.1 %like% "Rain", "Rain", "NoRain"))) %>%
+  
   mutate(OceanCond = as.factor(ifelse(Prevailing_weather_cond.1 %like% "calm" | Prevailing_weather_cond.1 %like% "Calm", "Calm", ifelse(Prevailing_weather_cond.1 %like% "rough" | Prevailing_weather_cond.1 %like% "choppy" | Prevailing_weather_cond.1 %like% "lop" | Prevailing_weather_cond.1 %like% "swell", "Rough", NA)))) %>%
+  
   mutate(SST_Celcius = gsub("Unknown", NA, SST_Celcius)) %>%
+  mutate(Wind_speed.1 = gsub("0-1", 0, Wind_speed.1)) %>%
   mutate(Wind_speed.1 = as.numeric(gsub("Unknown", NA, Wind_speed.1))) %>%
   mutate(Wind_direction.1 = gsub("Unknown", NA, Wind_direction.1)) %>%
   mutate(Wind = as.factor(ifelse(Wind_speed.1 < 12, "LowWind", "Windy"))) %>%
@@ -39,11 +47,9 @@ metadata <- read.csv("data/Soak_time_metadata_2024.csv", na.strings = "") %>%
 ```{r Weather MCA}
 #look at the proportional occurrence of each behaviour
 summary(metadata[c(27:31)])
-#does vocalizations fit with these categories?
-vars <- metadata %>% select(27:31)
 
 #Calculate the MCA
-mca <- MCA(vars, graph = FALSE)
+mca <- MCA(metadata %>% select(27:31), graph = FALSE)
 
 #Variance described by each axis
 get_eigenvalue(mca)
@@ -81,15 +87,34 @@ ggplot() +
 ```
 
 ```{r Load Rest of Data}
-main.data <- read.csv("data/Main_herring_2024_Catch_Bycatch.csv") %>%
-  left_join(metadata %>% dplyr::select(Trip_ID, Weather))
-
-morpho.data <- read.csv("data/Herring_morphometrics_2024.csv") %>%
+morpho.data <- read.csv("data/Main_herring_fishery_2024 - Herring_sampling.csv") %>%
   drop_na()
 
-summaryBy(Weight ~ Port, data = morpho.data)
+summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
+
+main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites.csv", na.strings = "") %>%
+  mutate(Port = ifelse(Trip_ID %like% "BdV", "BdV", "MH")) %>%
+  mutate(Total_catch_wt_kg = as.numeric(Total_catch_wt_kg)) %>%
+  mutate(Total_catch_wt_kg = 
+           ifelse(is.na(Total_catch_wt_kg) == T & Port == "BdV", 
+                  (Total_catch_number*271)/1000, Total_catch_wt_kg)) %>%
+  mutate(Time_setting = as.POSIXct(Time_setting, format = "%m/%d/%Y %H:%M:%S")) %>%
+  mutate(Time_pulling = as.POSIXct(Time_pulling, format = "%m/%d/%Y %H:%M:%S")) %>%
+  mutate(yDate = yday(Time_pulling)) %>%
+  left_join(metadata %>% dplyr::select(Trip_ID, Total_net_area_m2, Weather))
 
 #Subset
+sum.data <- main.data %>%
+  filter(!(Trip_ID == "MH_5" & Net_group == 2)) %>%
+  filter(!(Trip_ID == "MH_9" & Net_group == 2)) %>%
+  group_by(Port, Trip_ID, Net_treatment, yDate) %>%
+  summarise(Total_target_catch_number = sum(Total_catch_number, na.rm = T),
+            Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
+            Net_area_m2 = sum(Total_net_area_m2)) %>%
+  ungroup() %>%
+  mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2) + 0.00001)
+
+
 sum.data <- subset(main.data, main.data$Net_group=="Sum") %>% #sum of both nets
   mutate(Total_target_catch_kg = as.numeric(Total_target_catch_kg)) %>%
   mutate(Total_target_catch_number = as.numeric(Total_target_catch_number)) %>%
@@ -141,7 +166,7 @@ dev.off()
 summaryBy(scaled_weight ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
 
 #Create the model
-mod <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + yDate + I(yDate^2) + Weather, data = sum.data,
+mod <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + yDate + I(yDate^2), data = sum.data,
                family = gaussian(link = "identity"))
 sim1 <- simulateResiduals(mod, plot = T) #looks ok!
 performance::check_collinearity(mod)
@@ -152,6 +177,12 @@ Anova(mod)
 
 #Post-hoc test
 emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
+
+#Trying with soak duration
+mod2 <- glmmTMB(sqrt(scaled_weight) ~ Soak_duration + Port + yDate + I(yDate^2), data = sum.data,
+                family = gaussian(link = "identity"))
+simulateResiduals(mod2, plot = T)
+Anova(mod2)
 ```
 
 ```{r Bycatch Model - Soak Time}
@@ -220,7 +251,6 @@ simulateResiduals(logit_bycatchmod_soak, plot = T)
 summary(logit_bycatchmod_soak)
 Anova(logit_bycatchmod_soak)
 
-library(brglm)
 brglm_bycatch <- brglm(bycatch ~ Soak_duration + yDate + Port + scaled_weight, data = sum.data,
                        family = binomial)
 #simulateResiduals(brglm_bycatch, plot = T)
