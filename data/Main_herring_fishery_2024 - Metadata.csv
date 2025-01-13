@@ -1,54 +1,51 @@
-Trip_ID,Number_nets,Setting_time,Pulling_time,Soak_duration_hr,Coordinates,Port,Crew,Observers,Target_spc,Water_depth_m,Depth_surface_fathom,Mesh_size_inch,Net_height_fathom,Net_height_m,Net_length_m,Total_net_area_m2,SST,Wind_speed,Wind_direction,Prevailing_weather_cond,SST_Celcius,Wind_speed,Wind_direction,Prevailing_weather_cond,
-BdV_1,1,5/15/2024 10:00 AM,5/16/2024 6:14 AM,20:14,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby_Jessika_Bill,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,Unknown,Unknown,Unknown,Unknown,4.5,9,NNE,"Foggy, calm waters",
-BdV_2,1,5/16/2024 6:21 AM,5/17/2024 7:06 AM,24:45:00,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4.5,9,NNE,"Foggy, calm waters",3.5,19,N,"Foggy, slight lop",
-MH_1,2,5/16/2024 6:00 PM,"5/17/2024 6:00:00
+Trip_ID,Number_nets,Setting_time,Pulling_time,Soak_duration_hr,Coordinates,Port,Crew,Observers,Target_spc,Water_depth_m,Depth_surface_fathom,Mesh_size_inch,Net_height_fathom,Net_height_m,Net_length_m,Net_area_m2,SST,Wind_speed,Wind_direction,Prevailing_weather_cond,SST_Celcius,Wind_speed,Wind_direction,Prevailing_weather_cond,
+BdV_01,1,5/15/2024 10:00 AM,5/16/2024 6:14 AM,20:14,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby_Jessika_Bill,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,Unknown,Unknown,Unknown,Unknown,4.5,9,NNE,"Foggy, calm waters",
+BdV_02,1,5/16/2024 6:21 AM,5/17/2024 7:06 AM,24:45:00,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4.5,9,NNE,"Foggy, calm waters",3.5,19,N,"Foggy, slight lop",
+MH_01,2,5/16/2024 6:00 PM,"5/17/2024 6:00:00
 5/17/2024 6:30:00",12hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,Unknown,Unknown,Unknown,Unknown,13,South,"Cloudy, calm waters",
-MH_2,2,"5/17/2024 6:30:00
+MH_02,2,"5/17/2024 6:30:00
 5/17/2024 7:00:00","5/18/2024 6:15:00
 5/18/2024 6:30:00",24hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,13,South,"Cloudy, calm waters",Unknown,15,South,"Foggy, choppy waters",
-MH_3,2,"5/18/2024 6:30:00
+MH_03,2,"5/18/2024 6:30:00
 5/18/2024 6:45:00","5/18/2024 18:15:00
 5/18/2024 18:30:00",12hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,15,South,"Foggy, choppy waters",Unknown,18,SW,"Clear, rough waters",
-MH_4,2,"5/18/2024 18:30:00
+MH_04,2,"5/18/2024 18:30:00
 5/18/2024 18:45:00","5/19/2024 6:00:00
 5/19/2024 6:45:00",12hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,18,SW,"Clear, rough waters",Unknown,11,West,"Clear, choppy waters",
-BdV_3,1,5/17/2024 7:21 AM,5/18/2024 7:02:00,23:41,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,3.5,19,N,"Foggy, slight lop",4,5,N,"Foggy, calm waters",
-BdV_4,1,5/18/2024 7:16:00,5/19/2024 6:18:00,23:02,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,5,N,"Foggy, calm waters",4,2,N,"Overcast, very calm",
-MH_5,2,"5/19/2024 6:45:00
+BdV_03,1,5/17/2024 7:21 AM,5/18/2024 7:02:00,23:41,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,3.5,19,N,"Foggy, slight lop",4,5,N,"Foggy, calm waters",
+BdV_04,1,5/18/2024 7:16:00,5/19/2024 6:18:00,23:02,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,5,N,"Foggy, calm waters",4,2,N,"Overcast, very calm",
+MH_05,2,"5/19/2024 6:45:00
 5/19/2024 7:15:00","5/19/2024 18:15:00
 NA","12hr
 24hr","N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,11,West,"Clear, choppy waters",Unknown,25,NW,"Cloudy, very rough waters",
-BdV_5,1,5/19/2024 6:18:00,5/19/2024 15:34:00,9:16,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,2,N,"Overcast, very calm",5,12,,"Overcast, calm waters",wind speed from government of Canada website
-BdV_6,1,5/19/2024 15:34:00,5/20/2024 7:11:00,15:37,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,5,,,"Ovecast, calm waters",4,7,E,"0%cc, clear and very calm",
-MH_6,2,"5/19/2024 18:15:00
-5/19/2024 7:15:00","5/20/2024 6:15:00
-5/20/2024 6:45:00","12hr
-24hr","N49°27.8619', W53°57.2766'
-N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika_Bill,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,25,NW,"Cloudy, very rough waters",Unknown,10,N,"Sunny, clear, calm waters",
-MH_7,2,"5/20/2024 6:45:00
+BdV_05,1,5/19/2024 6:18:00,5/19/2024 15:34:00,9:16,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,2,N,"Overcast, very calm",5,12,,"Overcast, calm waters",wind speed from government of Canada website
+BdV_06,1,5/19/2024 15:34:00,5/20/2024 7:11:00,15:37,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,5,,,"Ovecast, calm waters",4,7,E,"0%cc, clear and very calm",
+MH_06.a,1,5/19/2024 18:15:00,5/20/2024 6:15:00,12hr,"N49°27.8619', W53°57.2766'",Musgrave_Harbour,Andrew,Jessika_Bill,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,25,NW,"Cloudy, very rough waters",Unknown,10,N,"Sunny, clear, calm waters",
+MH_06.b,1,5/19/2024 7:15:00,5/20/2024 6:45:00,24hr,"N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika_Bill,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,,,,Unknown,10,N,"Sunny, clear, calm waters",
+MH_07,2,"5/20/2024 6:45:00
 5/20/2024 7:15:00","5/21/2024 6:45:00
 5/21/2024 7:00:00",24hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika_Bill,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,10,N,"Sunny, clear, calm waters",Unknown,10,NE,"Sunny, clear, calm waters",
-BdV_7,1,5/20/2024 7:22:00,5/20/2024 16:13:00,8:51,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,7,E,"0%cc, clear and very calm",6,11,E,"0%cc, clear and very calm",
-MH_8,2,"5/21/2024 6:45:00
+BdV_07,1,5/20/2024 7:22:00,5/20/2024 16:13:00,8:51,"48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,7,E,"0%cc, clear and very calm",6,11,E,"0%cc, clear and very calm",
+MH_08,2,"5/21/2024 6:45:00
 5/21/2024 7:15:00","5/21/2024 18:15:00
 5/21/2024 18:30:00",12hr,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",Musgrave_Harbour,Andrew,Jessika_Bill,Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,Unknown,10,NE,"Sunny, clear, calm waters",Unknown,10,NE,"Sunny, clear, calm waters",
-BdV_8,2,"5/20/2024 16:00
+BdV_08,2,"5/20/2024 16:00
 5/20/2024 16:18","5/21/2024 7:08:00
 5/21/2024 6:09:00",12hr,"48.08504°N, 52.90193°W
 48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,6,11,E,"0%cc, clear and very calm",4,2,ESE,"Very foggy (<200m vis), perfectly calm",
-BdV_9,2,"5/21/2024 7:22:00
+BdV_09,2,"5/21/2024 7:22:00
 5/21/2024 6:49:00","5/21/2024 16:26:00
 5/21/2024 16:10:00","9:04
 9:21","48.08504°N, 52.90193°W
 48°05.1806, 52°54.0986",Baie_de_Verde,Tony_Joe,Bobby,Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,2,ESE,"Very foggy (<200m vis), perfectly calm",9,0-1,n/a,no cloud no wind very sunny calm waters,
-MH_9,2,"5/21/2024 18:15:00
+MH_09,2,"5/21/2024 18:15:00
 5/21/2024 18:30:00","5/22/2024 17:15:00
 NA","24hr
 NA","N49°27.8619', W53°57.2766'

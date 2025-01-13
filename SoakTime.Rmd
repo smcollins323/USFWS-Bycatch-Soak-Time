@@ -27,14 +27,59 @@ library(brglm)
 
 #Setting up main datasets
 metadata <- read.csv("data/Main_herring_fishery_2024 - Metadata.csv", na.strings = "") %>%
+  mutate(CloudCover = as.factor(
+    ifelse(
+      Prevailing_weather_cond.1 %like% "cloudy" |
+        Prevailing_weather_cond.1 %like% "Cloudy" |
+        Prevailing_weather_cond.1 %like% "overcast" |
+        Prevailing_weather_cond.1 %like% "Overcast" |
+        Prevailing_weather_cond.1 %like% "Rain",
+      "Cloudy",
+      ifelse(
+        Prevailing_weather_cond.1 %like% "clear" |
+          Prevailing_weather_cond.1 %like% "no cloud" |
+          Prevailing_weather_cond.1 %like% "Clear" |
+          Prevailing_weather_cond.1 %like% "sunny" |
+          Prevailing_weather_cond.1 %like% "Sunny",
+        "Clear",
+        ifelse(Prevailing_weather_cond.1 == "Unknown", NA, "Cloudy")
+      )
+    )
+  )) %>%
   
-  mutate(CloudCover = as.factor(ifelse(Prevailing_weather_cond.1 %like% "cloudy" | Prevailing_weather_cond.1 %like% "Cloudy" | Prevailing_weather_cond.1 %like% "overcast" | Prevailing_weather_cond.1 %like% "Overcast" | Prevailing_weather_cond.1 %like% "Rain", "Cloudy",ifelse(Prevailing_weather_cond.1 %like% "clear" | Prevailing_weather_cond.1 %like% "no cloud" | Prevailing_weather_cond.1 %like% "Clear" | Prevailing_weather_cond.1 %like% "sunny" | Prevailing_weather_cond.1 %like% "Sunny", "Clear",ifelse(Prevailing_weather_cond.1 == "Unknown", NA, "Cloudy"))))) %>%
+  mutate(Fog = as.factor(
+    ifelse(
+      Prevailing_weather_cond.1 %like% "fog" == TRUE |
+        Prevailing_weather_cond.1 %like% "Fog" == TRUE,
+      "Fog",
+      "NoFog"
+    )
+  )) %>%
   
-  mutate(Fog = as.factor(ifelse(Prevailing_weather_cond.1 %like% "fog" == TRUE | Prevailing_weather_cond.1 %like% "Fog" == TRUE, "Fog", "NoFog"))) %>%
+  mutate(Rain = as.factor(
+    ifelse(
+      Prevailing_weather_cond.1 %like% "rain" |
+        Prevailing_weather_cond.1 %like% "Rain",
+      "Rain",
+      "NoRain"
+    )
+  )) %>%
   
-  mutate(Rain = as.factor(ifelse(Prevailing_weather_cond.1 %like% "rain" | Prevailing_weather_cond.1 %like% "Rain", "Rain", "NoRain"))) %>%
-  
-  mutate(OceanCond = as.factor(ifelse(Prevailing_weather_cond.1 %like% "calm" | Prevailing_weather_cond.1 %like% "Calm", "Calm", ifelse(Prevailing_weather_cond.1 %like% "rough" | Prevailing_weather_cond.1 %like% "choppy" | Prevailing_weather_cond.1 %like% "lop" | Prevailing_weather_cond.1 %like% "swell", "Rough", NA)))) %>%
+  mutate(OceanCond = as.factor(
+    ifelse(
+      Prevailing_weather_cond.1 %like% "calm" |
+        Prevailing_weather_cond.1 %like% "Calm",
+      "Calm",
+      ifelse(
+        Prevailing_weather_cond.1 %like% "rough" |
+          Prevailing_weather_cond.1 %like% "choppy" |
+          Prevailing_weather_cond.1 %like% "lop" |
+          Prevailing_weather_cond.1 %like% "swell",
+        "Rough",
+        NA
+      )
+    )
+  )) %>%
   
   mutate(SST_Celcius = gsub("Unknown", NA, SST_Celcius)) %>%
   mutate(Wind_speed.1 = gsub("0-1", 0, Wind_speed.1)) %>%
@@ -87,13 +132,16 @@ ggplot() +
 ```
 
 ```{r Load Rest of Data}
-morpho.data <- read.csv("data/Main_herring_fishery_2024 - Herring_sampling.csv") %>%
+morpho.data <- read.csv("data/Main_herring_fishery_2024 - Herring_sampling.csv", na.strings = "NA") %>%
   drop_na()
 
 summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
+summaryBy(Sample_herring_wt_g ~ Port + Net_treatment, data = morpho.data)
+summaryBy(Sample_herring_FK_cm ~ Port + Net_treatment, data = morpho.data)
 
-main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites.csv", na.strings = "") %>%
+main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.csv", na.strings = "NA") %>%
   mutate(Port = ifelse(Trip_ID %like% "BdV", "BdV", "MH")) %>%
+  mutate(Total_catch_number = as.numeric(Total_catch_number)) %>%
   mutate(Total_catch_wt_kg = as.numeric(Total_catch_wt_kg)) %>%
   mutate(Total_catch_wt_kg = 
            ifelse(is.na(Total_catch_wt_kg) == T & Port == "BdV", 
@@ -101,44 +149,30 @@ main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites.csv
   mutate(Time_setting = as.POSIXct(Time_setting, format = "%m/%d/%Y %H:%M:%S")) %>%
   mutate(Time_pulling = as.POSIXct(Time_pulling, format = "%m/%d/%Y %H:%M:%S")) %>%
   mutate(yDate = yday(Time_pulling)) %>%
-  left_join(metadata %>% dplyr::select(Trip_ID, Total_net_area_m2, Weather))
+  mutate(Soak_duration = as.numeric(Time_pulling - Time_setting)) %>%
+  mutate_at(6:34, as.numeric) %>%
+  mutate(Birds = rowSums(.[16:33])) %>%
+  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds)) %>%
+  mutate(bycatch_sum = rowSums(.[12:15])) %>%
+  mutate(BirdTime = ifelse((as.ITime(Time_pulling) < 43200) == TRUE, "Morning", "Afternoon")) %>%
+  left_join(metadata %>% dplyr::select(Trip_ID, Weather))
 
 #Subset
 sum.data <- main.data %>%
-  filter(!(Trip_ID == "MH_5" & Net_group == 2)) %>%
-  filter(!(Trip_ID == "MH_9" & Net_group == 2)) %>%
-  group_by(Port, Trip_ID, Net_treatment, yDate) %>%
+  filter(!(Trip_ID %like% "MH_05" & Net_group == "b")) %>%
+  filter(!(Trip_ID %like% "MH_09" & Net_group == "b")) %>%
+  group_by(Port, Trip_ID, Net_treatment, yDate, Weather, BirdTime) %>%
   summarise(Total_target_catch_number = sum(Total_catch_number, na.rm = T),
             Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
-            Net_area_m2 = sum(Total_net_area_m2)) %>%
+            Net_area_m2 = sum(Total_net_area_m2, na.rm = T),
+            Soak_duration = mean(Soak_duration, na.rm = T),
+            Birds = sum(Birds, na.rm = T),
+            bycatch_sum = sum(bycatch_sum, na.rm = T)) %>%
   ungroup() %>%
-  mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2) + 0.00001)
-
-
-sum.data <- subset(main.data, main.data$Net_group=="Sum") %>% #sum of both nets
-  mutate(Total_target_catch_kg = as.numeric(Total_target_catch_kg)) %>%
-  mutate(Total_target_catch_number = as.numeric(Total_target_catch_number)) %>%
-  mutate(Total_target_catch_kg = ifelse(is.na(Total_target_catch_kg) == T & Port == "Baie_de_Verde", (Total_target_catch_number*271)/1000, Total_target_catch_kg)) %>%
-  mutate(NOGA_presence = as.numeric(NOGA_presence)) %>%
-  mutate(scaled_catch = Total_target_catch_number/Net_area_m2) %>%
+  mutate(bycatch = ifelse(bycatch_sum >0, 1, 0)) %>%
   mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2) + 0.00001) %>%
-  mutate(Date_pulling = as.Date(Date_pulling, format = "%m/%d/%Y")) %>%
-  mutate(Time_setting = as.POSIXct(Time_setting, format = "%m/%d/%Y %H:%M:%S")) %>%
-  mutate(Time_pulling = as.POSIXct(Time_pulling, format = "%m/%d/%Y %H:%M:%S")) %>%
-  mutate(yDate = yday(Date_pulling)) %>%
-  mutate(bycatch = ifelse(Bycatch_Sculpin != 0 | Bycatch_Salmon != 0 | 
-                          Bycatch_NOGA != 0 | Bycatch_Rock_Crab != 0 |
-                          Bycatch_Atlantic_Cod != 0 | Bycatch_Sea_Trout != 0 |
-                          Bycatch_Flounder != 0, 1, 0)) %>%
-  mutate(bycatch_sum = Bycatch_Sculpin + Bycatch_Salmon + Bycatch_NOGA +
-           Bycatch_Rock_Crab + Bycatch_Atlantic_Cod + Bycatch_Sea_Trout +
-                          Bycatch_Flounder) %>%
-  mutate(Soak_duration = as.numeric(Time_pulling - Time_setting)) %>%
-  mutate(Net_treatment = factor(Net_treatment, levels = c("24hr", "12_night", "12_day"))) %>%
-  mutate(Birds = rowSums(.[22:39])) %>%
-  mutate(BirdTime = ifelse((as.ITime(Time_pulling) < 43200) == TRUE, "Morning", "Afternoon")) %>%
-  mutate(Port = gsub("Baie_de_Verde", "Bay de Verde", Port)) %>%
-  mutate(Port = gsub("Musgrave_Harbour", "Musgrave Harbour", Port))
+  mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
+  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds))
 ```
 
 ```{r Summary Stats}
@@ -146,7 +180,7 @@ sum.data <- subset(main.data, main.data$Net_group=="Sum") %>% #sum of both nets
 table(sum.data$Net_treatment, sum.data$Port)
 
 #Sample sizes and summary of treatments
-summaryBy(Soak_duration ~ Net_treatment, data = sum.data %>% drop_na(Soak_duration), FUN = c(length, mean, sd, min, max))
+summaryBy(Soak_duration ~ Net_treatment, data = sum.data, FUN = c(length, mean, sd, min, max))
 ```
 
 ```{r Catch Model}
@@ -156,7 +190,7 @@ ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey") +
   geom_jitter(aes(colour = Port)) +
-  labs(x = "Net Treatment", y = bquote("Catch Weight" ~(kg/m^2))) +
+  labs(x = "Net Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2))) +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   theme_classic() +
   theme(legend.position = "top")
@@ -175,8 +209,23 @@ plotResiduals(sim1, form = sum.data$Port)
 plotResiduals(sim1, form = sum.data$yDate)
 Anova(mod)
 
+#try model with Date as random term
+mod1 <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + (1|yDate), data = sum.data,
+               family = gaussian(link = "identity"))
+sim1.1 <- simulateResiduals(mod1, plot = T) #looks ok!
+performance::check_collinearity(mod1)
+plotResiduals(sim1.1, form = sum.data$Net_treatment)
+plotResiduals(sim1.1, form = sum.data$Port)
+plotResiduals(sim1.1, form = sum.data$yDate)
+hist(unlist((ranef(mod1)))) #looks fine
+summary(mod1)
+Anova(mod1)
+
+AIC(mod, mod1)
+anova(mod, mod1)
+
 #Post-hoc test
-emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
+emmeans(mod1, list(pairwise ~ Net_treatment), adjust = "bh")
 
 #Trying with soak duration
 mod2 <- glmmTMB(sqrt(scaled_weight) ~ Soak_duration + Port + yDate + I(yDate^2), data = sum.data,
@@ -198,8 +247,8 @@ bycatch_box <- ggplot(data = sum.data, aes(x = Net_treatment, y = bycatch_sum)) 
   xlab("Net Treatment") +
   theme(legend.position = "top")
 
-#First look at the relationship with the categorical variable
-net_mod <- glmmTMB(bycatch_sum ~ Net_treatment + yDate + Port + scaled_weight + Weather, 
+#First, look at the relationship with the categorical variable
+net_mod <- glmmTMB(bycatch_sum ~ Net_treatment + Port + scaled_weight + Weather + (1|yDate), 
                    data = sum.data, family = poisson(link = "log"))
 performance::check_collinearity(net_mod)
 simulateResiduals(net_mod, plot = T)
@@ -210,10 +259,10 @@ emmeans(net_mod, list(pairwise ~ Net_treatment), adjust = "bh")
 #Next look at the relationship with just soak time
 
 #poisson regression
-soakmod <- glmmTMB(bycatch_sum ~ Soak_duration + yDate + Port + scaled_weight,
+soakmod <- glmmTMB(bycatch_sum ~ Soak_duration + Port + scaled_weight + (1|yDate),
                       data = sum.data, family = poisson(link = "log"))
 performance::check_collinearity(soakmod)
-#sim3 <- simulateResiduals(bycatchmod, plot = T)
+sim3 <- simulateResiduals(soakmod, plot = T)
 #plotResiduals(sim3, sum.data.na$Soak_duration)
 #plotResiduals(sim3, sum.data.na$Port)
 #plotResiduals(sim3, sum.data.na$yDate)
@@ -270,7 +319,7 @@ dev.off()
 
 ```{r Bird Occurrence Model}
 jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(data = sum.data, aes(x = BirdTime, y = Birds)) +
+ggplot(data = sum.data %>% drop_na(Birds), aes(x = BirdTime, y = Birds)) +
   geom_boxplot(fill = "lightgrey") +
   scale_colour_manual(values = c("red", "blue")) +
   xlab("Set/Haul Time") +
@@ -282,7 +331,7 @@ dev.off()
 
 summaryBy(Birds ~ BirdTime + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
 
-birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather + scaled_weight, 
+birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + Weather + scaled_weight + (1|yDate), 
                     data = sum.data %>% drop_na(Weather), 
                     family = nbinom2(link = "log"))
 birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather, 
