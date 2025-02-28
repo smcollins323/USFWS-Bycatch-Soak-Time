@@ -256,39 +256,6 @@ bycatch_box <- ggplot(data = sum.data, aes(x = Net_treatment, y = bycatch_sum)) 
   xlab("Soak Treatment") +
   theme(legend.position = "top")
 
-#First, look at the relationship with the categorical variable
-net_mod <- glmmTMB(bycatch_sum ~ Net_treatment + Port + scaled_weight + Weather + (1|yDate), 
-                   data = sum.data, family = poisson(link = "log"))
-performance::check_collinearity(net_mod)
-simulateResiduals(net_mod, plot = T)
-summary(net_mod)
-Anova(net_mod)
-emmeans(net_mod, list(pairwise ~ Net_treatment), adjust = "bh")
-
-#Next look at the relationship with just soak time
-
-#poisson regression
-soakmod <- glmmTMB(bycatch_sum ~ Soak_duration + Port + scaled_weight + (1|yDate),
-                      data = sum.data, family = poisson(link = "log"))
-performance::check_collinearity(soakmod)
-sim3 <- simulateResiduals(soakmod, plot = T)
-#plotResiduals(sim3, sum.data.na$Soak_duration)
-#plotResiduals(sim3, sum.data.na$Port)
-#plotResiduals(sim3, sum.data.na$yDate)
-summary(soakmod)
-Anova(soakmod)
-
-plot(sum.data$Soak_duration ~ sum.data$bycatch_sum)
-
-bycatch_predicted_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
-  geom_smooth(method = "glm", method.args = list(family = "poisson"), colour = "black") +
-  scale_colour_manual(values = c("red", "blue")) +
-  geom_point(aes(colour = Port)) +
-  theme_classic() +
-  xlab("Soak Duration (h)") +
-  ylab("Bycatch") +
-  theme(legend.position = "top")
-
 bycatch_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
   geom_smooth(method = "loess", colour = "black") +
   scale_colour_manual(values = c("red", "blue")) +
