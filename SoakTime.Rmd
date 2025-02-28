@@ -181,6 +181,15 @@ table(sum.data$Net_treatment, sum.data$Port)
 
 #Sample sizes and summary of treatments
 summaryBy(Soak_duration ~ Net_treatment, data = sum.data, FUN = c(length, mean, sd, min, max))
+
+#Herring Catch summary (Table S1)
+summaryBy(Total_target_catch_number ~ Net_treatment + Port, data = sum.data)
+summaryBy(Total_target_catch_kg ~ Net_treatment + Port, data = sum.data)
+summaryBy(Sample_herring_wt_g ~ Net_treatment + Port, data = morpho.data)
+summaryBy(Sample_herring_FK_cm ~ Net_treatment + Port, data = morpho.data)
+
+#Bird Sightings summary (Table S3)
+summaryBy(NOGA + DCCO + Cormorant_sp + BLGU + ATPU + COMU + RAZO + COEI + BLKI + HERG + GBBG + RBGU + LBBG + ICGU + COTE ~ Port + BirdTime, data = main.data %>% drop_na(16:33), FUN = sum)
 ```
 
 ```{r Catch Model}
@@ -188,9 +197,9 @@ summaryBy(Soak_duration ~ Net_treatment, data = sum.data, FUN = c(length, mean, 
 jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
   scale_colour_manual(values = c("red", "blue")) +
-  geom_boxplot(fill = "lightgrey") +
+  geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port)) +
-  labs(x = "Net Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2))) +
+  labs(x = "Soak Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2))) +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   theme_classic() +
   theme(legend.position = "top")
@@ -238,13 +247,13 @@ Anova(mod2)
 summaryBy(bycatch_sum ~ Net_treatment, data = sum.data %>% drop_na(bycatch_sum), FUN = c(mean, sum, length))
 
 bycatch_box <- ggplot(data = sum.data, aes(x = Net_treatment, y = bycatch_sum)) +
-  geom_boxplot(fill = "lightgrey") +
+  geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port), width = 0.3, height = 0) +
   theme_classic() +
-  ylab("Number of Bycaught Individuals") +
+  ylab("Bycatch") +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   scale_colour_manual(values = c("red", "blue")) +
-  xlab("Net Treatment") +
+  xlab("Soak Treatment") +
   theme(legend.position = "top")
 
 #First, look at the relationship with the categorical variable
@@ -271,13 +280,22 @@ Anova(soakmod)
 
 plot(sum.data$Soak_duration ~ sum.data$bycatch_sum)
 
-bycatch_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
+bycatch_predicted_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
   geom_smooth(method = "glm", method.args = list(family = "poisson"), colour = "black") +
   scale_colour_manual(values = c("red", "blue")) +
   geom_point(aes(colour = Port)) +
   theme_classic() +
   xlab("Soak Duration (h)") +
-  ylab("Number of Bycaught Individuals") +
+  ylab("Bycatch") +
+  theme(legend.position = "top")
+
+bycatch_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
+  geom_smooth(method = "loess", colour = "black") +
+  scale_colour_manual(values = c("red", "blue")) +
+  geom_point(aes(colour = Port)) +
+  theme_classic() +
+  xlab("Soak Duration (h)") +
+  ylab("Bycatch") +
   theme(legend.position = "top")
 
 jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
@@ -322,7 +340,7 @@ jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "c
 ggplot(data = sum.data %>% drop_na(Birds), aes(x = BirdTime, y = Birds)) +
   geom_boxplot(fill = "lightgrey") +
   scale_colour_manual(values = c("red", "blue")) +
-  xlab("Set/Haul Time") +
+  xlab("Timing of Haul and Resetting") +
   ylab("Number of Birds") +
   geom_jitter(aes(colour = Port)) +
   theme_classic() +
