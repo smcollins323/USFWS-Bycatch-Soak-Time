@@ -172,6 +172,7 @@ sum.data <- main.data %>%
   mutate(bycatch = ifelse(bycatch_sum >0, 1, 0)) %>%
   mutate(bycatch_scaled = bycatch_sum / Soak_duration / Net_area_m2) %>%
   mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2)) %>%
+  mutate(catch_m2h = Total_target_catch_kg/Net_area_m2/Soak_duration) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
   mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds))
 ```
@@ -194,7 +195,7 @@ summaryBy(NOGA + DCCO + Cormorant_sp + BLGU + ATPU + COMU + RAZO + COEI + BLKI +
 ```
 
 ```{r Catch Model}
-#Check assumptions ANOVA for Catch weight
+#Check assumptions for Catch weight
 jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
   scale_colour_manual(values = c("red", "blue")) +
@@ -215,16 +216,58 @@ summaryBy(scaled_weight ~ Net_treatment, data = sum.data, FUN = c(mean, median, 
 #try model with Tweedie distribution
 mod <- glmmTMB(scaled_weight ~ Net_treatment + Port + (1|yDate), data = sum.data,
                 family = tweedie(link = "log"))
+
+#check model assumptions
 sim1 <- simulateResiduals(mod, plot = T)
 performance::check_collinearity(mod)
 plotResiduals(sim1, form = sum.data$Net_treatment)
 plotResiduals(sim1, form = sum.data$Port)
 plotResiduals(sim1, form = sum.data$yDate)
+
+#assumptions looks good, get model results
 summary(mod)
 Anova(mod)
 
 #Post-hoc test
 emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
+```
+
+```{r Scalesd Catch Model}
+#Check assumptions for Catch weight
+jpeg(filename = "figures/ScaledCatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
+ggplot(sum.data, aes(x = Net_treatment, y = catch_m2h)) +
+  scale_colour_manual(values = c("red", "blue")) +
+  geom_boxplot(fill = "lightgrey", outliers = FALSE) +
+  geom_jitter(aes(colour = Port)) +
+  labs(x = "Soak Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2/h))) +
+  scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
+  theme_classic() +
+  theme(legend.position = "top")
+dev.off()
+
+#Clearly not normal, does contain 0s so Gamma not an option
+hist(sum.data$catch_m2h)
+
+#Get summary stats
+summaryBy(catch_m2h ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
+
+#try model with Tweedie distribution
+mod1 <- glmmTMB(catch_m2h ~ Net_treatment + Port + (1|yDate), data = sum.data,
+                family = tweedie(link = "log"))
+
+#check model assumptions
+sim1.1 <- simulateResiduals(mod1, plot = T)
+performance::check_collinearity(mod1)
+plotResiduals(sim1.1, form = sum.data$Net_treatment)
+plotResiduals(sim1.1, form = sum.data$Port)
+plotResiduals(sim1.1, form = sum.data$yDate)
+
+#assumptions looks good, get model results
+summary(mod1)
+Anova(mod1)
+
+#Post-hoc test
+emmeans(mod1, list(pairwise ~ Net_treatment), adjust = "bh")
 ```
 
 ```{r Bycatch Data}
