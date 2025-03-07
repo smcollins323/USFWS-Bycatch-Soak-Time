@@ -170,7 +170,8 @@ sum.data <- main.data %>%
             bycatch_sum = sum(bycatch_sum, na.rm = T)) %>%
   ungroup() %>%
   mutate(bycatch = ifelse(bycatch_sum >0, 1, 0)) %>%
-  mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2) + 0.00001) %>%
+  mutate(bycatch_scaled = bycatch_sum / Soak_duration / Net_area_m2) %>%
+  mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2)) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
   mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds))
 ```
@@ -205,52 +206,35 @@ ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
   theme(legend.position = "top")
 dev.off()
 
+#Clearly not normal, does contain 0s so Gamma not an option
+hist(sum.data$scaled_weight)
+
 #Get summary stats
 summaryBy(scaled_weight ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
 
-#Create the model
-mod <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + yDate + I(yDate^2), data = sum.data,
-               family = gaussian(link = "identity"))
-sim1 <- simulateResiduals(mod, plot = T) #looks ok!
+#try model with Tweedie distribution
+mod <- glmmTMB(scaled_weight ~ Net_treatment + Port + (1|yDate), data = sum.data,
+                family = tweedie(link = "log"))
+sim1 <- simulateResiduals(mod, plot = T)
 performance::check_collinearity(mod)
 plotResiduals(sim1, form = sum.data$Net_treatment)
 plotResiduals(sim1, form = sum.data$Port)
 plotResiduals(sim1, form = sum.data$yDate)
+summary(mod)
 Anova(mod)
 
-#try model with Date as random term
-mod1 <- glmmTMB(sqrt(scaled_weight) ~ Net_treatment + Port + (1|yDate), data = sum.data,
-               family = gaussian(link = "identity"))
-sim1.1 <- simulateResiduals(mod1, plot = T) #looks ok!
-performance::check_collinearity(mod1)
-plotResiduals(sim1.1, form = sum.data$Net_treatment)
-plotResiduals(sim1.1, form = sum.data$Port)
-plotResiduals(sim1.1, form = sum.data$yDate)
-hist(unlist((ranef(mod1)))) #looks fine
-summary(mod1)
-Anova(mod1)
-
-AIC(mod, mod1)
-anova(mod, mod1)
-
 #Post-hoc test
-emmeans(mod1, list(pairwise ~ Net_treatment), adjust = "bh")
-
-#Trying with soak duration
-mod2 <- glmmTMB(sqrt(scaled_weight) ~ Soak_duration + Port + yDate + I(yDate^2), data = sum.data,
-                family = gaussian(link = "identity"))
-simulateResiduals(mod2, plot = T)
-Anova(mod2)
+emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
 ```
 
-```{r Bycatch Model - Soak Time}
+```{r Bycatch Data}
 summaryBy(bycatch_sum ~ Net_treatment, data = sum.data %>% drop_na(bycatch_sum), FUN = c(mean, sum, length))
 
 bycatch_box <- ggplot(data = sum.data, aes(x = Net_treatment, y = bycatch_sum)) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port), width = 0.3, height = 0) +
   theme_classic() +
-  ylab("Bycatch") +
+  ylab("Bycatch (Number of Individuals)") +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   scale_colour_manual(values = c("red", "blue")) +
   xlab("Soak Treatment") +
@@ -265,42 +249,34 @@ bycatch_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum))
   ylab("Bycatch") +
   theme(legend.position = "top")
 
+bycatch_scaled_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_scaled)) +
+  geom_smooth(method = "loess", colour = "black") +
+  scale_colour_manual(values = c("red", "blue")) +
+  geom_point(aes(colour = Port)) +
+  theme_classic() +
+  xlab("Soak Duration (h)") +
+  ylab(bquote(Bycatch~(Individuals/m^2/h))) +
+  theme(legend.position = "top")
+
 jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
-bycatch_box / bycatch_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
-dev.off()
-
-#logistic regression
-logit_bycatchmod <- glmmTMB(bycatch ~ Net_treatment + yDate + Port + scaled_weight, data = sum.data,
-                            family = binomial(link = "logit"))
-simulateResiduals(logit_bycatchmod, plot = T)
-summary(logit_bycatchmod)
-Anova(logit_bycatchmod)
-
-modX <- brglm(bycatch ~ Net_treatment + yDate + Port + scaled_weight, data = sum.data, family = binomial)
-summary(modX)
-
-logit_bycatchmod_soak <- glmmTMB(bycatch ~ Soak_duration + yDate + Port + scaled_weight, data = sum.data,
-                            family = binomial(link = "logit"))
-simulateResiduals(logit_bycatchmod_soak, plot = T)
-summary(logit_bycatchmod_soak)
-Anova(logit_bycatchmod_soak)
-
-brglm_bycatch <- brglm(bycatch ~ Soak_duration + yDate + Port + scaled_weight, data = sum.data,
-                       family = binomial)
-#simulateResiduals(brglm_bycatch, plot = T)
-summary(brglm_bycatch)
-
-jpeg(filename = "figures/Bycatch_Odds.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(ggpredict(brglm_bycatch, terms = "Soak_duration [all]"), aes(x, predicted)) +
-  labs(y = "Odds of Bycatch", x = "Soak Duration (h)")+
-  geom_point() +
-  geom_line() +
-  ylim(0, 1) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1) +
-  theme(panel.background = element_rect(fill = 'white', colour = 'black'), 
-        axis.title = element_text(size = 12), axis.text = element_text(size = 10))
+bycatch_box / bycatch_scaled_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 dev.off()
 ```
+
+```{r Bird Occurrence Fig}
+phen <- read.csv("data/SeabirdPhenology.csv") %>%
+  mutate(BreedingPhase = factor(BreedingPhase, levels = c("Pre-laying", "Incubation", "Chick-rearing", "Fledging", "Overwinter"))) %>%
+  mutate(Species = factor(Species, levels = c("Eiders", "Shearwaters", "Gulls", "NOGA", "BLKI", "COMU", "ATPU"))) %>%
+  mutate(x = as.POSIXct(x), xend = as.POSIXct(xend))
+
+ggplot() +
+  scale_colour_viridis(option = "D", discrete = TRUE, direction = -1, name = "Breeding Phase") +
+  scale_x_datetime(labels = date_format("%b"), date_breaks = "1 month", name = "Month") +
+  geom_rect(aes(xmin = as.POSIXct("2024-05-15"), xmax = as.POSIXct("2024-05-27"), ymin = 0, ymax = 7.5), alpha = 0.3) +
+  geom_segment(data = phen, aes(x = x, xend = xend, y = Species, yend = Species, colour = BreedingPhase), linewidth = 3) +
+  theme_classic()
+```
+
 
 ```{r Bird Occurrence Model}
 jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
