@@ -170,11 +170,12 @@ sum.data <- main.data %>%
             bycatch_sum = sum(bycatch_sum, na.rm = T)) %>%
   ungroup() %>%
   mutate(bycatch = ifelse(bycatch_sum >0, 1, 0)) %>%
-  mutate(bycatch_scaled = bycatch_sum / Soak_duration / Net_area_m2) %>%
+  mutate(bycatch_rate = bycatch_sum / Soak_duration / Net_area_m2) %>%
   mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2)) %>%
-  mutate(catch_m2h = Total_target_catch_kg/Net_area_m2/Soak_duration) %>%
+  mutate(catch_rate = Total_target_catch_kg/Net_area_m2/Soak_duration) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
-  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds))
+  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds)) %>%
+  mutate(BycatchSpecies = ifelse(Trip_ID == "MH_15", "Birds", "Fish"))
 ```
 
 ```{r Summary Stats}
@@ -232,10 +233,10 @@ Anova(mod)
 emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
 ```
 
-```{r Scalesd Catch Model}
+```{r Catch Rate Model}
 #Check assumptions for Catch weight
 jpeg(filename = "figures/ScaledCatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(sum.data, aes(x = Net_treatment, y = catch_m2h)) +
+ggplot(sum.data, aes(x = Net_treatment, y = catch_rate)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port)) +
@@ -246,13 +247,13 @@ ggplot(sum.data, aes(x = Net_treatment, y = catch_m2h)) +
 dev.off()
 
 #Clearly not normal, does contain 0s so Gamma not an option
-hist(sum.data$catch_m2h)
+hist(sum.data$catch_rate)
 
 #Get summary stats
-summaryBy(catch_m2h ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
+summaryBy(catch_rate ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
 
 #try model with Tweedie distribution
-mod1 <- glmmTMB(catch_m2h ~ Net_treatment + Port + (1|yDate), data = sum.data,
+mod1 <- glmmTMB(catch_rate ~ Net_treatment + Port + (1|yDate), data = sum.data,
                 family = tweedie(link = "log"))
 
 #check model assumptions
@@ -273,36 +274,68 @@ emmeans(mod1, list(pairwise ~ Net_treatment), adjust = "bh")
 ```{r Bycatch Data}
 summaryBy(bycatch_sum ~ Net_treatment, data = sum.data %>% drop_na(bycatch_sum), FUN = c(mean, sum, length))
 
-bycatch_box <- ggplot(data = sum.data, aes(x = Net_treatment, y = bycatch_sum)) +
+#separating out the birds from the fish
+
+bycatch_box <- ggplot(
+  data = sum.data %>%
+    mutate(bycatch_sum = ifelse(BycatchSpecies == "Birds", 3, bycatch_sum)) %>%
+    add_row(
+      Port = "MH",
+      Trip_ID = "MH_15",
+      Net_treatment = "24h",
+      yDate = 148,
+      bycatch_sum = 1,
+      BycatchSpecies = "Fish"
+    ) %>%
+    mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))),
+  aes(x = Net_treatment, y = bycatch_sum)
+) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
-  geom_jitter(aes(colour = Port), width = 0.3, height = 0) +
+  geom_jitter(
+    aes(colour = Port, pch = BycatchSpecies),
+    width = 0.3,
+    height = 0,
+    size = 2.5
+  ) +
   theme_classic() +
   ylab("Bycatch (Number of Individuals)") +
-  scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
+  scale_x_discrete(labels = c('Control', 'Reduced Night', 'Reduced Day')) +
   scale_colour_manual(values = c("red", "blue")) +
+  scale_shape_manual(values = c(2, 1), name = "Species") +
   xlab("Soak Treatment") +
   theme(legend.position = "top")
 
-bycatch_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_sum)) +
+bycatchRate_line <- ggplot(
+  data = sum.data %>%
+    mutate(bycatch_sum = ifelse(BycatchSpecies == "Birds", 3, bycatch_sum)) %>%
+    mutate(bycatch_rate = ifelse(BycatchSpecies == "Birds", 3/682.777/36, bycatch_rate)) %>%
+    add_row(
+      Port = "MH",
+      Trip_ID = "MH_15",
+      Net_treatment = "24h",
+      yDate = 148,
+      Soak_duration = 36,
+      bycatch_sum = 1,
+      BycatchSpecies = "Fish",
+      bycatch_rate = 1/682.2777/36
+    ) %>%
+    mutate(Net_treatment = factor(
+      Net_treatment, levels = c("24h", "12_night", "12_day")
+    )),
+  aes(x = Soak_duration, y = bycatch_rate)
+) +
   geom_smooth(method = "loess", colour = "black") +
   scale_colour_manual(values = c("red", "blue")) +
-  geom_point(aes(colour = Port)) +
+  scale_shape_manual(values = c(2, 1), name = "Species") +
+  geom_point(aes(colour = Port, pch = BycatchSpecies), size = 2.5) +
   theme_classic() +
   xlab("Soak Duration (h)") +
-  ylab("Bycatch") +
-  theme(legend.position = "top")
-
-bycatch_scaled_line <- ggplot(data = sum.data, aes(x = Soak_duration, y = bycatch_scaled)) +
-  geom_smooth(method = "loess", colour = "black") +
-  scale_colour_manual(values = c("red", "blue")) +
-  geom_point(aes(colour = Port)) +
-  theme_classic() +
-  xlab("Soak Duration (h)") +
-  ylab(bquote(Bycatch~(Individuals/m^2/h))) +
+  ylab(bquote(Bycatch ~ Rate ~ (Individuals / m^2 / h))) +
+  coord_cartesian(ylim = c(0, max(sum.data$bycatch_rate))) +
   theme(legend.position = "top")
 
 jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
-bycatch_box / bycatch_scaled_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+bycatch_box / bycatchRate_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 dev.off()
 ```
 
