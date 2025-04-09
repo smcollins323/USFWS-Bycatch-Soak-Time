@@ -152,6 +152,10 @@ sum.data <- main.data %>%
   mutate(Birds = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Birds)) %>%
   mutate(Surface_feeders = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Surface_feeders)) %>%
   mutate(Divers = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Divers))
+
+save(metadata, file = "data/metadata.Rda")
+save(main.data, file = "data/main.data.Rda")
+save(sum.data, file = "data/sum.data.Rda")
 ```
 
 ```{r Morphometric Summary Stats}
@@ -183,7 +187,7 @@ jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "
 ggplot(sum.data, aes(x = Net_treatment, y = Scaled_weight)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
-  geom_jitter(aes(colour = Port)) +
+  geom_jitter(aes(colour = Port), pch = 21, size = 2) +
   labs(x = "Soak Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2))) +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   theme_classic() +
@@ -317,7 +321,7 @@ bycatchRate_line <- ggplot(
   theme(legend.position = "top")
 
 jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
-bycatch_box / bycatchRate_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+bycatch_box / bycatchRate_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "top")
 dev.off()
 ```
 
@@ -333,13 +337,16 @@ ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
   theme(legend.position = "top")
 dev.off()
 
+tiff("figures/Fig_5.tif", width = 16, height = 10, units = "cm", res = 300)
 ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time, y = Birds)) +
   geom_point(aes(colour = Port)) +
+  geom_smooth() +
   scale_colour_manual(values = c("red", "blue")) +
   xlab("Time of Haul and Resetting") +
   ylab("Number of Birds") +
   theme_classic() +
   theme(legend.position = "top")
+dev.off()
 
 ggplot(data = sum.data) +
   geom_smooth(aes(x = Bird_time, y = Divers), method = "lm", colour = "black") +
@@ -363,11 +370,11 @@ plotResiduals(sim2, form = bird.data$Port)
 plotResiduals(sim2, form = bird.data$Wind_speed)
 plotResiduals(sim2, form = bird.data$Fog)
 plotResiduals(sim2, form = bird.data$Scaled_weight)
-performance::check_collinearity(birdmod1)
+performance::check_collinearity(birdmod)
 
 #Looks good, check model fit
-summary(birdmod1)
-Anova(birdmod1)
+summary(birdmod)
+Anova(birdmod)
 
 #Do the same thing for divers only
 diversmod <- glmmTMB(Divers ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
@@ -400,43 +407,16 @@ performance::check_collinearity(sfmod)
 #Looks good, check model fit
 summary(sfmod)
 Anova(sfmod)
-```
 
-```{r Random Forest - Weather}
-library(caTools)
-library(randomForest)
-
-split <- sample.split(as.data.frame(sum.data), SplitRatio = 0.7)
-train <- subset(as.data.frame(sum.data), split == "TRUE") %>%
-  drop_na(Wind_direction) %>%
-  mutate(Weather = as.factor(Weather)) %>%
-  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
-test <- subset(as.data.frame(sum.data), split == "FALSE") %>%
-  drop_na(Wind_direction) %>%
-  mutate(Weather = as.factor(Weather)) %>%
-  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
-
-set.seed(120)
-classifier_RF = randomForest(x = train[-1], 
-                             y = train$Weather, 
-                             ntree = 500)
-classifier_RF
-plot(classifier_RF)
-
-y_pred = predict(classifier_RF, newdata = test[-1])
-
-confusion_mtx = table(test[,1], y_pred)
-confusion_mtx
-
-importance(classifier_RF)
-
-varImpPlot(classifier_RF)
-```
-
-```{r Random Forest - Whole Model}
-crf <- randomForest(Birds ~ Bird_time + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
-
-crf
-plot(crf)
-varImpPlot(crf)
+tiff("figures/Fig_5.tif", width = 16, height = 10, units = "cm", res = 300)
+plot_model(birdmod, type = "eff", terms = "Bird_time", colors = "black") +
+  scale_colour_manual(name = "Port", values = c("red", "blue")) +
+  geom_point(data = sum.data %>% drop_na(Wind_speed), aes(x = Bird_time, y = Birds, colour = Port), pch = 21, cex = 2) +
+  xlab("Time of Hauling (hour of day)") +
+  ylab("Number of Birds") +
+  theme_classic() +
+  guides(color = guide_legend(override.aes = list(fill = NA))) +
+  ggtitle(NULL) +
+  theme(legend.position = "top")
+dev.off()
 ```
