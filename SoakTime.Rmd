@@ -95,7 +95,7 @@ main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.cs
   mutate(yDate = yday(Time_hauling)) %>%
   mutate(Soak_duration = as.numeric(Time_hauling - Time_setting)) %>%
   mutate_at(7:35, as.numeric) %>%
-  mutate(BirdTime = as.numeric(as.ITime(Time_hauling))/60/60) %>%
+  mutate(Bird_time = as.numeric(as.ITime(Time_hauling))/60/60) %>%
   mutate(Birds = rowSums(.[17:34])) %>%
   mutate(Surface_feeders = rowSums(.[17:23])) %>%
   mutate(Divers = rowSums(.[24:31])) %>%
@@ -135,7 +135,7 @@ sum.data <- main.data %>%
     Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
     Net_area_m2 = sum(Total_net_area_m2, na.rm = T),
     Soak_duration = mean(Soak_duration, na.rm = T),
-    Bird_time = mean(BirdTime, na.rm = T),
+    Bird_time = mean(Bird_time, na.rm = T),
     Birds = sum(Birds, na.rm = T),
     Surface_feeders = sum(Surface_feeders, na.rm = T),
     Divers = sum(Divers, na.rm = T),
@@ -148,7 +148,10 @@ sum.data <- main.data %>%
   mutate(Catch_rate = as.numeric(Total_target_catch_kg / Net_area_m2 / Soak_duration)) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
   mutate(Bycatch_species = as.factor(ifelse(Trip_ID == "MH_15", "Birds", "Fish"))) %>%
-  mutate(Bird_time_cat = as.factor(ifelse(Bird_time < 12, "Morning", "Afternoon")))
+  mutate(Bird_time_cat = as.factor(ifelse(Bird_time < 12, "Morning", "Afternoon"))) %>%
+  mutate(Birds = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Birds)) %>%
+  mutate(Surface_feeders = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Surface_feeders)) %>%
+  mutate(Divers = ifelse(Birds == 0 & Surface_feeders == 0 & Divers == 0, NA, Divers))
 ```
 
 ```{r Morphometric Summary Stats}
@@ -320,7 +323,7 @@ dev.off()
 
 ```{r Bird Occurrence Model}
 jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(data = sum.data %>% drop_na(Birds), aes(x = BirdTime, y = Birds)) +
+ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
   geom_boxplot(fill = "lightgrey") +
   scale_colour_manual(values = c("red", "blue")) +
   xlab("Timing of Haul and Resetting") +
@@ -330,33 +333,73 @@ ggplot(data = sum.data %>% drop_na(Birds), aes(x = BirdTime, y = Birds)) +
   theme(legend.position = "top")
 dev.off()
 
-summaryBy(Birds ~ BirdTime + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
+ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time, y = Birds)) +
+  geom_point(aes(colour = Port)) +
+  scale_colour_manual(values = c("red", "blue")) +
+  xlab("Time of Haul and Resetting") +
+  ylab("Number of Birds") +
+  theme_classic() +
+  theme(legend.position = "top")
 
-birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
-                    data = sum.data, 
-                    family = nbinom2(link = "log"))
+ggplot(data = sum.data) +
+  geom_smooth(aes(x = Bird_time, y = Divers), method = "lm", colour = "black") +
+  geom_smooth(aes(x = Bird_time, y = Surface_feeders), method = "lm", colour = "red", fill = "red") +
+  theme_classic()
 
 ggplot() +
   geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = Wind_speed)) +
   theme_classic()
 
-birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather, 
-                    data = sum.data %>% drop_na(Weather), 
-                   family = nbinom2(link = "log"))
-birdmod3 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Scaled_weight, 
-                    data = sum.data %>% drop_na(Weather), 
-                    family = nbinom2(link = "log"))
-birdmod4 <- glmmTMB(Birds ~ BirdTime + Port + yDate, 
-                    data = sum.data %>% drop_na(Weather), 
-                    family = nbinom2(link = "log"))
-anova(birdmod1, birdmod2, birdmod3, birdmod4)
-anova(birdmod2, birdmod3, birdmod4)
-anova(birdmod2, birdmod4)
-anova(birdmod3, birdmod4)
-simulateResiduals(birdmod1, plot = T)
+summaryBy(Birds + Divers + Surface_feeders ~ Bird_time_cat + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
+
+bird.data <- sum.data %>% drop_na(Bird_time, Wind_speed, Fog)
+
+birdmod <- glmmTMB(Birds ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
+                    data = bird.data, family = nbinom2(link = "log"))
+#Check assumptions
+sim2 <- simulateResiduals(birdmod, plot = T)
+plotResiduals(sim2, form = bird.data$Bird_time)
+plotResiduals(sim2, form = bird.data$Port)
+plotResiduals(sim2, form = bird.data$Wind_speed)
+plotResiduals(sim2, form = bird.data$Fog)
+plotResiduals(sim2, form = bird.data$Scaled_weight)
 performance::check_collinearity(birdmod1)
+
+#Looks good, check model fit
 summary(birdmod1)
 Anova(birdmod1)
+
+#Do the same thing for divers only
+diversmod <- glmmTMB(Divers ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
+                    data = sum.data, family = nbinom2(link = "log"))
+
+sim2.1 <- simulateResiduals(diversmod, plot = T)
+plotResiduals(sim2.1, form = bird.data$Bird_time)
+plotResiduals(sim2.1, form = bird.data$Port)
+plotResiduals(sim2.1, form = bird.data$Wind_speed)
+plotResiduals(sim2.1, form = bird.data$Fog)
+plotResiduals(sim2.1, form = bird.data$Scaled_weight)
+performance::check_collinearity(diversmod)
+
+#Looks good, check model fit
+summary(diversmod)
+Anova(diversmod)
+
+#And the same for surface feeders
+sfmod <- glmmTMB(Surface_feeders ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
+                    data = sum.data, family = nbinom2(link = "log"))
+
+sim2.2 <- simulateResiduals(sfmod, plot = T)
+plotResiduals(sim2.2, form = bird.data$Bird_time)
+plotResiduals(sim2.2, form = bird.data$Port)
+plotResiduals(sim2.2, form = bird.data$Wind_speed)
+plotResiduals(sim2.2, form = bird.data$Fog)
+plotResiduals(sim2.2, form = bird.data$Scaled_weight)
+performance::check_collinearity(sfmod)
+
+#Looks good, check model fit
+summary(sfmod)
+Anova(sfmod)
 ```
 
 ```{r Random Forest - Weather}
@@ -391,7 +434,7 @@ varImpPlot(classifier_RF)
 ```
 
 ```{r Random Forest - Whole Model}
-crf <- randomForest(Birds ~ BirdTime + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
+crf <- randomForest(Birds ~ Bird_time + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
 
 crf
 plot(crf)
