@@ -27,6 +27,7 @@ library(brglm)
 library(scales)
 
 #Setting up main datasets
+####Metadata####
 metadata <- read.csv("data/Main_herring_fishery_2024 - Metadata.csv", na.strings = "") %>%
   mutate(Cloud_cover = ifelse(
       Prevailing_weather_cond %like% "cloudy" |
@@ -74,14 +75,14 @@ metadata <- read.csv("data/Main_herring_fishery_2024 - Metadata.csv", na.strings
   drop_na(Observers, Wind) %>%
   mutate_at(c("Port", "Trip_ID", "Soak_duration", "Wind_direction_set", "Wind_direction", "Cloud_cover", "Fog", "Rain", "Ocean_cond", "Wind"), as.factor)
 
-#Herring morphometrics data
+####Herring Morphometrics Data####
 morpho.data <- read.csv("data/Main_herring_fishery_2024 - Herring_sampling.csv", na.strings = "NA") %>%
+  mutate_at(1:3, as.factor) %>%
   drop_na()
 
-#Catch data
+####Full Catch Data####
 main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.csv",
                       na.strings = "NA") %>%
-  mutate(Port = as.factor(ifelse(Trip_ID %like% "BdV", "BdV", "MH"))) %>%
   mutate(Total_catch_number = as.numeric(Total_catch_number)) %>%
   mutate(Total_catch_wt_kg =
            as.numeric(ifelse(
@@ -90,22 +91,18 @@ main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.cs
              Total_catch_wt_kg
            ))) %>%
   mutate(Time_setting = as.POSIXct(Time_setting, format = "%m/%d/%Y %H:%M:%S")) %>%
-  mutate(Time_pulling = as.POSIXct(Time_pulling, format = "%m/%d/%Y %H:%M:%S")) %>%
-  mutate(yDate = yday(Time_pulling)) %>%
-  mutate(Soak_duration = as.numeric(Time_pulling - Time_setting)) %>%
-  mutate_at(6:34, as.numeric) %>%
-  mutate(Birds = rowSums(.[16:33])) %>%
-  mutate(Birds = ifelse(Trip_ID == "BdV_00" |
-                          Trip_ID == "BdV_16", NA, Birds)) %>%
-  mutate(bycatch_sum = rowSums(.[12:15])) %>%
-  mutate(BirdTime = as.factor(ifelse((as.ITime(Time_pulling) < 43200) == TRUE, 
-                                     "Morning", "Afternoon"
-  ))) %>%
+  mutate(Time_hauling = as.POSIXct(Time_hauling, format = "%m/%d/%Y %H:%M:%S")) %>%
+  mutate(yDate = yday(Time_hauling)) %>%
+  mutate(Soak_duration = as.numeric(Time_hauling - Time_setting)) %>%
+  mutate_at(7:35, as.numeric) %>%
+  mutate(BirdTime = as.numeric(as.ITime(Time_hauling))/60/60) %>%
+  mutate(Birds = rowSums(.[17:34])) %>%
+  mutate(Surface_feeders = rowSums(.[17:23])) %>%
+  mutate(Divers = rowSums(.[24:31])) %>%
+  mutate(Bycatch_sum = rowSums(.[13:16])) %>%
   left_join(
     metadata %>% dplyr::select(
       Trip_ID,
-      Weather,
-      SST_Celcius,
       Wind_speed,
       Wind_direction,
       Cloud_cover,
@@ -113,9 +110,11 @@ main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.cs
       Rain,
       Ocean_cond
     )
-  )
+  ) %>%
+  mutate_at(1:4, as.factor)
 
-#Subset
+####Summed Catch Data####
+#Catch dataset with individual nets summed per trip
 sum.data <- main.data %>%
   filter(!(Trip_ID %like% "MH_05" & Net_group == "b")) %>%
   filter(!(Trip_ID %like% "MH_09" & Net_group == "b")) %>%
@@ -124,8 +123,6 @@ sum.data <- main.data %>%
     Trip_ID,
     Net_treatment,
     yDate,
-    BirdTime,
-    Weather,
     Cloud_cover,
     Fog,
     Rain,
@@ -133,33 +130,32 @@ sum.data <- main.data %>%
     Wind_direction
   ) %>%
   summarise(
-    SST = sum(SST_Celcius, na.rm = T),
-    WindSpeed = mean(Wind_speed, na.rm = T),
+    Wind_speed = mean(Wind_speed, na.rm = T),
     Total_target_catch_number = sum(Total_catch_number, na.rm = T),
     Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
     Net_area_m2 = sum(Total_net_area_m2, na.rm = T),
     Soak_duration = mean(Soak_duration, na.rm = T),
+    Bird_time = mean(BirdTime, na.rm = T),
     Birds = sum(Birds, na.rm = T),
-    bycatch_sum = sum(bycatch_sum, na.rm = T)
+    Surface_feeders = sum(Surface_feeders, na.rm = T),
+    Divers = sum(Divers, na.rm = T),
+    Bycatch_sum = sum(Bycatch_sum, na.rm = T)
   ) %>%
   ungroup() %>%
-  mutate(WindSpeed = as.numeric(gsub("NaN", NA, WindSpeed))) %>%
-  mutate(bycatch = ifelse(bycatch_sum > 0, 1, 0)) %>%
-  mutate(bycatch_rate = as.numeric(bycatch_sum / Soak_duration / Net_area_m2)) %>%
-  mutate(scaled_weight = as.numeric(Total_target_catch_kg / Net_area_m2)) %>%
-  mutate(catch_rate = as.numeric(Total_target_catch_kg / Net_area_m2 / Soak_duration)) %>%
+  mutate(Wind_speed = as.numeric(gsub("NaN", NA, Wind_speed))) %>%
+  mutate(Bycatch_rate = as.numeric(Bycatch_sum / Soak_duration / Net_area_m2)) %>%
+  mutate(Scaled_weight = as.numeric(Total_target_catch_kg / Net_area_m2)) %>%
+  mutate(Catch_rate = as.numeric(Total_target_catch_kg / Net_area_m2 / Soak_duration)) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
-  mutate(Birds = as.numeric(ifelse(Trip_ID == "BdV_00" |
-                          Trip_ID == "BdV_16", NA, Birds))) %>%
-  mutate(BycatchSpecies = as.factor(ifelse(Trip_ID == "MH_15", "Birds", "Fish")))
+  mutate(Bycatch_species = as.factor(ifelse(Trip_ID == "MH_15", "Birds", "Fish"))) %>%
+  mutate(Bird_time_cat = as.factor(ifelse(Bird_time < 12, "Morning", "Afternoon")))
 ```
 
-```{r}
+```{r Morphometric Summary Stats}
 summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
 summaryBy(Sample_herring_wt_g ~ Port + Net_treatment, data = morpho.data)
 summaryBy(Sample_herring_FK_cm ~ Port + Net_treatment, data = morpho.data)
 ```
-
 
 ```{r Summary Stats}
 #Sample Size
@@ -175,13 +171,13 @@ summaryBy(Sample_herring_wt_g ~ Net_treatment + Port, data = morpho.data)
 summaryBy(Sample_herring_FK_cm ~ Net_treatment + Port, data = morpho.data)
 
 #Bird Sightings summary (Table S3)
-summaryBy(NOGA + DCCO + Cormorant_sp + BLGU + ATPU + COMU + RAZO + COEI + BLKI + HERG + GBBG + RBGU + LBBG + ICGU + COTE ~ Port + BirdTime, data = main.data %>% drop_na(16:33), FUN = sum)
+summaryBy(NOGA + DCCO + Cormorant_sp + BLGU + ATPU + COMU + RAZO + COEI + BLKI + HERG + GBBG + RBGU + LBBG + ICGU + COTE ~ Port + Bird_time_cat, data = main.data %>% drop_na(16:33), FUN = sum)
 ```
 
 ```{r Catch Model}
 #Check assumptions for Catch weight
 jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
+ggplot(sum.data, aes(x = Net_treatment, y = Scaled_weight)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port)) +
@@ -192,13 +188,13 @@ ggplot(sum.data, aes(x = Net_treatment, y = scaled_weight)) +
 dev.off()
 
 #Clearly not normal, does contain 0s so Gamma not an option
-hist(sum.data$scaled_weight)
+hist(sum.data$Scaled_weight)
 
 #Get summary stats
-summaryBy(scaled_weight ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
+summaryBy(Scaled_weight ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
 
 #try model with Tweedie distribution
-mod <- glmmTMB(scaled_weight ~ Net_treatment + Port + (1|yDate), data = sum.data,
+mod <- glmmTMB(Scaled_weight ~ Net_treatment + Port + (1|yDate), data = sum.data,
                 family = tweedie(link = "log"))
 
 #check model assumptions
@@ -219,7 +215,7 @@ emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
 ```{r Catch Rate Model}
 #Check assumptions for Catch weight
 jpeg(filename = "figures/ScaledCatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
-ggplot(sum.data, aes(x = Net_treatment, y = catch_rate)) +
+ggplot(sum.data, aes(x = Net_treatment, y = Catch_rate)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port)) +
@@ -230,13 +226,13 @@ ggplot(sum.data, aes(x = Net_treatment, y = catch_rate)) +
 dev.off()
 
 #Clearly not normal, does contain 0s so Gamma not an option
-hist(sum.data$catch_rate)
+hist(sum.data$Catch_rate)
 
 #Get summary stats
-summaryBy(catch_rate ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
+summaryBy(Catch_rate ~ Net_treatment, data = sum.data, FUN = c(mean, median, sd))
 
 #try model with Tweedie distribution
-mod1 <- glmmTMB(catch_rate ~ Net_treatment + Port + (1|yDate), data = sum.data,
+mod1 <- glmmTMB(Catch_rate ~ Net_treatment + Port + (1|yDate), data = sum.data,
                 family = tweedie(link = "log"))
 
 #check model assumptions
@@ -255,27 +251,27 @@ emmeans(mod1, list(pairwise ~ Net_treatment), adjust = "bh")
 ```
 
 ```{r Bycatch Data}
-summaryBy(bycatch_sum ~ Net_treatment, data = sum.data %>% drop_na(bycatch_sum), FUN = c(mean, sum, length))
+summaryBy(Bycatch_sum ~ Net_treatment, data = sum.data %>% drop_na(Bycatch_sum), FUN = c(mean, sum, length))
 
 #separating out the birds from the fish
 
 bycatch_box <- ggplot(
   data = sum.data %>%
-    mutate(bycatch_sum = ifelse(BycatchSpecies == "Birds", 3, bycatch_sum)) %>%
+    mutate(Bycatch_sum = ifelse(Bycatch_species == "Birds", 3, Bycatch_sum)) %>%
     add_row(
       Port = "MH",
       Trip_ID = "MH_15",
       Net_treatment = "24h",
       yDate = 148,
-      bycatch_sum = 1,
-      BycatchSpecies = "Fish"
+      Bycatch_sum = 1,
+      Bycatch_species = "Fish"
     ) %>%
     mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))),
-  aes(x = Net_treatment, y = bycatch_sum)
+  aes(x = Net_treatment, y = Bycatch_sum)
 ) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(
-    aes(colour = Port, pch = BycatchSpecies),
+    aes(colour = Port, pch = Bycatch_species),
     width = 0.3,
     height = 0,
     size = 2.5
@@ -290,50 +286,36 @@ bycatch_box <- ggplot(
 
 bycatchRate_line <- ggplot(
   data = sum.data %>%
-    mutate(bycatch_sum = ifelse(BycatchSpecies == "Birds", 3, bycatch_sum)) %>%
-    mutate(bycatch_rate = ifelse(BycatchSpecies == "Birds", 3/682.777/36, bycatch_rate)) %>%
+    mutate(Bycatch_sum = ifelse(Bycatch_species == "Birds", 3, Bycatch_sum)) %>%
+    mutate(Bycatch_rate = ifelse(Bycatch_species == "Birds", 3/682.777/36, Bycatch_rate)) %>%
     add_row(
       Port = "MH",
       Trip_ID = "MH_15",
       Net_treatment = "24h",
       yDate = 148,
       Soak_duration = 36,
-      bycatch_sum = 1,
-      BycatchSpecies = "Fish",
-      bycatch_rate = 1/682.2777/36
+      Bycatch_sum = 1,
+      Bycatch_species = "Fish",
+      Bycatch_rate = 1/682.2777/36
     ) %>%
     mutate(Net_treatment = factor(
       Net_treatment, levels = c("24h", "12_night", "12_day")
     )),
-  aes(x = Soak_duration, y = bycatch_rate)
+  aes(x = Soak_duration, y = Bycatch_rate)
 ) +
   geom_smooth(method = "loess", colour = "black") +
   scale_colour_manual(values = c("red", "blue")) +
   scale_shape_manual(values = c(2, 1), name = "Species") +
-  geom_point(aes(colour = Port, pch = BycatchSpecies), size = 2.5) +
+  geom_point(aes(colour = Port, pch = Bycatch_species), size = 2.5) +
   theme_classic() +
   xlab("Soak Duration (h)") +
   ylab(bquote(Bycatch ~ Rate ~ (Individuals / m^2 / h))) +
-  coord_cartesian(ylim = c(0, max(sum.data$bycatch_rate))) +
+  coord_cartesian(ylim = c(0, max(sum.data$Bycatch_rate))) +
   theme(legend.position = "top")
 
 jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
 bycatch_box / bycatchRate_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 dev.off()
-```
-
-```{r Bird Occurrence Fig}
-phen <- read.csv("data/SeabirdPhenology.csv") %>%
-  mutate(BreedingPhase = factor(BreedingPhase, levels = c("Pre-laying", "Incubation", "Chick-rearing", "Fledging", "Overwinter"))) %>%
-  mutate(Species = factor(Species, levels = c("Eiders", "Shearwaters", "Gulls", "NOGA", "BLKI", "COMU", "ATPU"))) %>%
-  mutate(x = as.POSIXct(x), xend = as.POSIXct(xend))
-
-ggplot() +
-  scale_colour_viridis(option = "D", discrete = TRUE, direction = -1, name = "Breeding Phase") +
-  scale_x_datetime(labels = date_format("%b"), date_breaks = "1 month", name = "Month") +
-  geom_rect(aes(xmin = as.POSIXct("2024-05-15"), xmax = as.POSIXct("2024-05-27"), ymin = 0, ymax = 7.5), alpha = 0.3) +
-  geom_segment(data = phen, aes(x = x, xend = xend, y = Species, yend = Species, colour = BreedingPhase), linewidth = 3) +
-  theme_classic()
 ```
 
 ```{r Bird Occurrence Model}
@@ -350,18 +332,18 @@ dev.off()
 
 summaryBy(Birds ~ BirdTime + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
 
-birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + WindSpeed + Fog + scaled_weight + (1|yDate), 
+birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
                     data = sum.data, 
                     family = nbinom2(link = "log"))
 
 ggplot() +
-  geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = WindSpeed)) +
+  geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = Wind_speed)) +
   theme_classic()
 
 birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather, 
                     data = sum.data %>% drop_na(Weather), 
                    family = nbinom2(link = "log"))
-birdmod3 <- glmmTMB(Birds ~ BirdTime + Port + yDate + scaled_weight, 
+birdmod3 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Scaled_weight, 
                     data = sum.data %>% drop_na(Weather), 
                     family = nbinom2(link = "log"))
 birdmod4 <- glmmTMB(Birds ~ BirdTime + Port + yDate, 
@@ -385,11 +367,11 @@ split <- sample.split(as.data.frame(sum.data), SplitRatio = 0.7)
 train <- subset(as.data.frame(sum.data), split == "TRUE") %>%
   drop_na(Wind_direction) %>%
   mutate(Weather = as.factor(Weather)) %>%
-  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, WindSpeed)
+  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
 test <- subset(as.data.frame(sum.data), split == "FALSE") %>%
   drop_na(Wind_direction) %>%
   mutate(Weather = as.factor(Weather)) %>%
-  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, WindSpeed)
+  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
 
 set.seed(120)
 classifier_RF = randomForest(x = train[-1], 
@@ -409,7 +391,7 @@ varImpPlot(classifier_RF)
 ```
 
 ```{r Random Forest - Whole Model}
-crf <- randomForest(Birds ~ BirdTime + Port + scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + WindSpeed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
+crf <- randomForest(Birds ~ BirdTime + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
 
 crf
 plot(crf)
