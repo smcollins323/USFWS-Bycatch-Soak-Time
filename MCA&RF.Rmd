@@ -1,0 +1,145 @@
+---
+title: "MCA and Random Forest"
+author: "Sydney M. Collins"
+date: "2025-04-09"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+rm(list = ls())
+library(raster)
+library(ncdf4)
+library(gstat)
+library(RCurl)
+library(RNetCDF)
+library(ncdf4.helpers)
+library(spatialEco)
+library(curl)
+library(jsonlite)
+library(tidyverse)
+library(dismo)
+library(beepr)
+library(terra)
+
+load("data/metadata.Rda")
+load("data/main.data.Rda")
+load("data/sum.data.Rda")
+```
+
+```{r Get SST}
+#Specify the dates you want to download
+dates <- as.character(date_seq(start = "2024-05-15", end = "2024-05-27", step = "day"))
+
+#Download all the historic SST data from NOAA
+#Make sure the target colony coordinates are specified in the url line
+#Coordinates for Funk: ")][(48):1:(51)][(-57):1:(-51)]"
+for(i in dates){
+ url <- paste("https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.nc?analysed_sst[(", i, ")][(48.088333):1:(48.084333)][(-52.903639):1:(-52.899639)]", sep = "")
+ destfile <- paste("data/SSTFiles/BdV", i, ".nc", sep = "")
+ download.file(url = url, destfile = destfile, mode = "wb")
+}
+
+for(i in dates){
+ url <- paste("https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.nc?analysed_sst[(", i, ")][(49.466365):1:(49.462365)][(-53.957610):1:(-53.952610)]", sep = "")
+ destfile <- paste("data/SSTFiles/MH", i, ".nc", sep = "")
+ download.file(url = url, destfile = destfile, mode = "wb")
+}
+beep()
+
+f <- list.files(path = "data/SSTFiles/", pattern = 'nc$', full.names = TRUE)
+r <- rast(f[1], "SST")
+d <- data.frame(Longitude = -52.901639, Latitude = 48.086333)
+v <- vect(d, geom = c("Longitude", "Latitude"))
+e <- extract(r, v)
+
+plot(r[[1]])
+
+r2 <- lapply(r, getValues)
+r3 <- lapply(r2, na.omit)
+
+results <- as.data.frame(sapply(r3, mean)) %>%
+ mutate(filename = f)
+```
+
+```{r Weather MCA}
+#look at the proportional occurrence of each behaviour
+summary(metadata[c(27:31)])
+
+#Calculate the MCA
+mca <- MCA(metadata %>% dplyr::select(27:31), graph = FALSE)
+
+#Variance described by each axis
+get_eigenvalue(mca)
+fviz_screeplot(mca, addlabels = TRUE, ylim = c(0, 45))
+
+#Visualize dimensions and where points lie
+fviz_mca_var(mca, choice = "mca.cor", repel = TRUE, ggtheme = theme_minimal())
+fviz_mca_biplot(mca, repel = TRUE, ggtheme = theme_minimal())
+
+#Variable Loadings
+var <- get_mca_var(mca)
+var$coord
+var$contrib
+jpeg(filename = "figures/MCA_plot.jpeg", width = 16, height = 16, units = "cm", res = 300)
+fviz_mca_var(mca, repel = TRUE, col.var = "black", ggtheme = theme_classic())
+dev.off()
+
+#Quality of representation in 2 dimensions
+var$cos2
+fviz_mca_var(mca, col.var = "cos2", gradient.cols = c("red", "#E7B800", "darkgreen"), repel = TRUE, ggtheme = theme_minimal())
+    #Most variables are well represented
+
+#Individual Values
+ind <- get_mca_ind(mca)
+ind$coord
+metadata$Weather_dim <- ind$coord[,1]
+metadata$Weather <- ifelse(metadata$Weather_dim > 0, "bad", "good")
+
+#Histogram of weather scores
+ggplot() +
+  ylab("Frequency") +
+  xlab("Weather Score (Dim1)") +
+  geom_histogram(data = metadata, aes(x = Weather_dim), fill = "grey", colour = "black") +
+  theme_classic()
+```
+
+```{r Random Forest - Weather}
+library(caTools)
+library(randomForest)
+
+split <- sample.split(as.data.frame(sum.data), SplitRatio = 0.7)
+train <- subset(as.data.frame(sum.data), split == "TRUE") %>%
+  drop_na(Wind_direction) %>%
+  mutate(Weather = as.factor(Weather)) %>%
+  dplyr::select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
+test <- subset(as.data.frame(sum.data), split == "FALSE") %>%
+  drop_na(Wind_direction) %>%
+  mutate(Weather = as.factor(Weather)) %>%
+  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
+
+set.seed(120)
+classifier_RF = randomForest(x = train[-1], 
+                             y = train$Weather, 
+                             ntree = 500)
+classifier_RF
+plot(classifier_RF)
+
+y_pred = predict(classifier_RF, newdata = test[-1])
+
+confusion_mtx = table(test[,1], y_pred)
+confusion_mtx
+
+importance(classifier_RF)
+
+varImpPlot(classifier_RF)
+```
+
+```{r Random Forest - Whole Model}
+crf <- randomForest(Birds ~ Bird_time + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed + yDate, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
+
+crf
+plot(crf)
+varImpPlot(crf)
+```
