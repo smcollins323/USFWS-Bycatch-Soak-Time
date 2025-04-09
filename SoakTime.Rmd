@@ -24,159 +24,142 @@ library(factoextra)
 library(viridis)
 library(patchwork)
 library(brglm)
+library(scales)
 
 #Setting up main datasets
 metadata <- read.csv("data/Main_herring_fishery_2024 - Metadata.csv", na.strings = "") %>%
-  mutate(CloudCover = as.factor(
-    ifelse(
-      Prevailing_weather_cond.1 %like% "cloudy" |
-        Prevailing_weather_cond.1 %like% "Cloudy" |
-        Prevailing_weather_cond.1 %like% "overcast" |
-        Prevailing_weather_cond.1 %like% "Overcast" |
-        Prevailing_weather_cond.1 %like% "Rain",
+  mutate(Cloud_cover = ifelse(
+      Prevailing_weather_cond %like% "cloudy" |
+        Prevailing_weather_cond %like% "Cloudy" |
+        Prevailing_weather_cond %like% "overcast" |
+        Prevailing_weather_cond %like% "Overcast" |
+        Prevailing_weather_cond %like% "Rain",
       "Cloudy",
       ifelse(
-        Prevailing_weather_cond.1 %like% "clear" |
-          Prevailing_weather_cond.1 %like% "no cloud" |
-          Prevailing_weather_cond.1 %like% "Clear" |
-          Prevailing_weather_cond.1 %like% "sunny" |
-          Prevailing_weather_cond.1 %like% "Sunny",
+        Prevailing_weather_cond %like% "clear" |
+          Prevailing_weather_cond %like% "no cloud" |
+          Prevailing_weather_cond %like% "Clear" |
+          Prevailing_weather_cond %like% "sunny" |
+          Prevailing_weather_cond %like% "Sunny",
         "Clear",
-        ifelse(Prevailing_weather_cond.1 == "Unknown", NA, "Cloudy")
+        ifelse(Prevailing_weather_cond == "Unknown", NA, "Cloudy")
       )
-    )
   )) %>%
-  
-  mutate(Fog = as.factor(
-    ifelse(
-      Prevailing_weather_cond.1 %like% "fog" == TRUE |
-        Prevailing_weather_cond.1 %like% "Fog" == TRUE,
+  mutate(Fog = ifelse(
+      Prevailing_weather_cond %like% "fog" == TRUE |
+        Prevailing_weather_cond %like% "Fog" == TRUE,
       "Fog",
       "NoFog"
-    )
-  )) %>%
-  
-  mutate(Rain = as.factor(
-    ifelse(
-      Prevailing_weather_cond.1 %like% "rain" |
-        Prevailing_weather_cond.1 %like% "Rain",
+    )) %>%
+  mutate(Rain = ifelse(
+      Prevailing_weather_cond %like% "rain" |
+        Prevailing_weather_cond %like% "Rain",
       "Rain",
       "NoRain"
-    )
-  )) %>%
-  
-  mutate(OceanCond = as.factor(
-    ifelse(
-      Prevailing_weather_cond.1 %like% "calm" |
-        Prevailing_weather_cond.1 %like% "Calm",
+    )) %>%
+  mutate(Ocean_cond = ifelse(
+      Prevailing_weather_cond %like% "calm" |
+        Prevailing_weather_cond %like% "Calm",
       "Calm",
       ifelse(
-        Prevailing_weather_cond.1 %like% "rough" |
-          Prevailing_weather_cond.1 %like% "choppy" |
-          Prevailing_weather_cond.1 %like% "lop" |
-          Prevailing_weather_cond.1 %like% "swell",
+        Prevailing_weather_cond %like% "rough" |
+          Prevailing_weather_cond %like% "choppy" |
+          Prevailing_weather_cond %like% "lop" |
+          Prevailing_weather_cond %like% "swell",
         "Rough",
         NA
       )
-    )
-  )) %>%
-  
-  mutate(SST_Celcius = gsub("Unknown", NA, SST_Celcius)) %>%
-  mutate(Wind_speed.1 = gsub("0-1", 0, Wind_speed.1)) %>%
-  mutate(Wind_speed.1 = as.numeric(gsub("Unknown", NA, Wind_speed.1))) %>%
-  mutate(Wind_direction.1 = gsub("Unknown", NA, Wind_direction.1)) %>%
-  mutate(Wind = as.factor(ifelse(Wind_speed.1 < 12, "LowWind", "Windy"))) %>%
-  drop_na(Observers, Wind)
-```
+    )) %>%
+  mutate(Wind = ifelse(Wind_speed < 12, "LowWind", "Windy")) %>%
+  drop_na(Observers, Wind) %>%
+  mutate_at(c("Port", "Trip_ID", "Soak_duration", "Wind_direction_set", "Wind_direction", "Cloud_cover", "Fog", "Rain", "Ocean_cond", "Wind"), as.factor)
 
-```{r Weather MCA}
-#look at the proportional occurrence of each behaviour
-summary(metadata[c(27:31)])
-
-#Calculate the MCA
-mca <- MCA(metadata %>% select(27:31), graph = FALSE)
-
-#Variance described by each axis
-get_eigenvalue(mca)
-fviz_screeplot(mca, addlabels = TRUE, ylim = c(0, 45))
-
-#Visualize dimensions and where points lie
-fviz_mca_var(mca, choice = "mca.cor", repel = TRUE, ggtheme = theme_minimal())
-fviz_mca_biplot(mca, repel = TRUE, ggtheme = theme_minimal())
-
-#Variable Loadings
-var <- get_mca_var(mca)
-var$coord
-var$contrib
-jpeg(filename = "figures/MCA_plot.jpeg", width = 16, height = 16, units = "cm", res = 300)
-fviz_mca_var(mca, repel = TRUE, col.var = "black", ggtheme = theme_classic())
-dev.off()
-
-#Quality of representation in 2 dimensions
-var$cos2
-fviz_mca_var(mca, col.var = "cos2", gradient.cols = c("red", "#E7B800", "darkgreen"), repel = TRUE, ggtheme = theme_minimal())
-    #Most variables are well represented
-
-#Individual Values
-ind <- get_mca_ind(mca)
-ind$coord
-metadata$Weather_dim <- ind$coord[,1]
-metadata$Weather <- ifelse(metadata$Weather_dim > 0, "bad", "good")
-
-#Histogram of weather scores
-ggplot() +
-  ylab("Frequency") +
-  xlab("Weather Score (Dim1)") +
-  geom_histogram(data = metadata, aes(x = Weather_dim), fill = "grey", colour = "black") +
-  theme_classic()
-```
-
-```{r Load Rest of Data}
+#Herring morphometrics data
 morpho.data <- read.csv("data/Main_herring_fishery_2024 - Herring_sampling.csv", na.strings = "NA") %>%
   drop_na()
 
-summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
-summaryBy(Sample_herring_wt_g ~ Port + Net_treatment, data = morpho.data)
-summaryBy(Sample_herring_FK_cm ~ Port + Net_treatment, data = morpho.data)
-
-main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.csv", na.strings = "NA") %>%
-  mutate(Port = ifelse(Trip_ID %like% "BdV", "BdV", "MH")) %>%
+#Catch data
+main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.csv",
+                      na.strings = "NA") %>%
+  mutate(Port = as.factor(ifelse(Trip_ID %like% "BdV", "BdV", "MH"))) %>%
   mutate(Total_catch_number = as.numeric(Total_catch_number)) %>%
-  mutate(Total_catch_wt_kg = as.numeric(Total_catch_wt_kg)) %>%
-  mutate(Total_catch_wt_kg = 
-           ifelse(is.na(Total_catch_wt_kg) == T & Port == "BdV", 
-                  (Total_catch_number*271)/1000, Total_catch_wt_kg)) %>%
+  mutate(Total_catch_wt_kg =
+           as.numeric(ifelse(
+             is.na(Total_catch_wt_kg) == T & Port == "BdV",
+             (Total_catch_number * 271) / 1000,
+             Total_catch_wt_kg
+           ))) %>%
   mutate(Time_setting = as.POSIXct(Time_setting, format = "%m/%d/%Y %H:%M:%S")) %>%
   mutate(Time_pulling = as.POSIXct(Time_pulling, format = "%m/%d/%Y %H:%M:%S")) %>%
   mutate(yDate = yday(Time_pulling)) %>%
   mutate(Soak_duration = as.numeric(Time_pulling - Time_setting)) %>%
   mutate_at(6:34, as.numeric) %>%
   mutate(Birds = rowSums(.[16:33])) %>%
-  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds)) %>%
+  mutate(Birds = ifelse(Trip_ID == "BdV_00" |
+                          Trip_ID == "BdV_16", NA, Birds)) %>%
   mutate(bycatch_sum = rowSums(.[12:15])) %>%
-  mutate(BirdTime = ifelse((as.ITime(Time_pulling) < 43200) == TRUE, "Morning", "Afternoon")) %>%
-  left_join(metadata %>% dplyr::select(Trip_ID, Weather))
+  mutate(BirdTime = as.factor(ifelse((as.ITime(Time_pulling) < 43200) == TRUE, 
+                                     "Morning", "Afternoon"
+  ))) %>%
+  left_join(
+    metadata %>% dplyr::select(
+      Trip_ID,
+      Weather,
+      SST_Celcius,
+      Wind_speed,
+      Wind_direction,
+      Cloud_cover,
+      Fog,
+      Rain,
+      Ocean_cond
+    )
+  )
 
 #Subset
 sum.data <- main.data %>%
   filter(!(Trip_ID %like% "MH_05" & Net_group == "b")) %>%
   filter(!(Trip_ID %like% "MH_09" & Net_group == "b")) %>%
-  group_by(Port, Trip_ID, Net_treatment, yDate, Weather, BirdTime) %>%
-  summarise(Total_target_catch_number = sum(Total_catch_number, na.rm = T),
-            Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
-            Net_area_m2 = sum(Total_net_area_m2, na.rm = T),
-            Soak_duration = mean(Soak_duration, na.rm = T),
-            Birds = sum(Birds, na.rm = T),
-            bycatch_sum = sum(bycatch_sum, na.rm = T)) %>%
+  group_by(
+    Port,
+    Trip_ID,
+    Net_treatment,
+    yDate,
+    BirdTime,
+    Weather,
+    Cloud_cover,
+    Fog,
+    Rain,
+    Ocean_cond,
+    Wind_direction
+  ) %>%
+  summarise(
+    SST = sum(SST_Celcius, na.rm = T),
+    WindSpeed = mean(Wind_speed, na.rm = T),
+    Total_target_catch_number = sum(Total_catch_number, na.rm = T),
+    Total_target_catch_kg = sum(Total_catch_wt_kg, na.rm = T),
+    Net_area_m2 = sum(Total_net_area_m2, na.rm = T),
+    Soak_duration = mean(Soak_duration, na.rm = T),
+    Birds = sum(Birds, na.rm = T),
+    bycatch_sum = sum(bycatch_sum, na.rm = T)
+  ) %>%
   ungroup() %>%
-  mutate(bycatch = ifelse(bycatch_sum >0, 1, 0)) %>%
-  mutate(bycatch_rate = bycatch_sum / Soak_duration / Net_area_m2) %>%
-  mutate(scaled_weight = (Total_target_catch_kg/Net_area_m2)) %>%
-  mutate(catch_rate = Total_target_catch_kg/Net_area_m2/Soak_duration) %>%
+  mutate(WindSpeed = as.numeric(gsub("NaN", NA, WindSpeed))) %>%
+  mutate(bycatch = ifelse(bycatch_sum > 0, 1, 0)) %>%
+  mutate(bycatch_rate = as.numeric(bycatch_sum / Soak_duration / Net_area_m2)) %>%
+  mutate(scaled_weight = as.numeric(Total_target_catch_kg / Net_area_m2)) %>%
+  mutate(catch_rate = as.numeric(Total_target_catch_kg / Net_area_m2 / Soak_duration)) %>%
   mutate(Net_treatment = factor(Net_treatment, levels = c("24h", "12_night", "12_day"))) %>%
-  mutate(Birds = ifelse(Trip_ID == "BdV_00" | Trip_ID == "BdV_16", NA, Birds)) %>%
-  mutate(BycatchSpecies = ifelse(Trip_ID == "MH_15", "Birds", "Fish"))
+  mutate(Birds = as.numeric(ifelse(Trip_ID == "BdV_00" |
+                          Trip_ID == "BdV_16", NA, Birds))) %>%
+  mutate(BycatchSpecies = as.factor(ifelse(Trip_ID == "MH_15", "Birds", "Fish")))
 ```
+
+```{r}
+summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
+summaryBy(Sample_herring_wt_g ~ Port + Net_treatment, data = morpho.data)
+summaryBy(Sample_herring_FK_cm ~ Port + Net_treatment, data = morpho.data)
+```
+
 
 ```{r Summary Stats}
 #Sample Size
@@ -353,7 +336,6 @@ ggplot() +
   theme_classic()
 ```
 
-
 ```{r Bird Occurrence Model}
 jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(data = sum.data %>% drop_na(Birds), aes(x = BirdTime, y = Birds)) +
@@ -368,9 +350,14 @@ dev.off()
 
 summaryBy(Birds ~ BirdTime + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
 
-birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + Weather + scaled_weight + (1|yDate), 
-                    data = sum.data %>% drop_na(Weather), 
+birdmod1 <- glmmTMB(Birds ~ BirdTime + Port + WindSpeed + Fog + scaled_weight + (1|yDate), 
+                    data = sum.data, 
                     family = nbinom2(link = "log"))
+
+ggplot() +
+  geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = WindSpeed)) +
+  theme_classic()
+
 birdmod2 <- glmmTMB(Birds ~ BirdTime + Port + yDate + Weather, 
                     data = sum.data %>% drop_na(Weather), 
                    family = nbinom2(link = "log"))
@@ -388,4 +375,43 @@ simulateResiduals(birdmod1, plot = T)
 performance::check_collinearity(birdmod1)
 summary(birdmod1)
 Anova(birdmod1)
+```
+
+```{r Random Forest - Weather}
+library(caTools)
+library(randomForest)
+
+split <- sample.split(as.data.frame(sum.data), SplitRatio = 0.7)
+train <- subset(as.data.frame(sum.data), split == "TRUE") %>%
+  drop_na(Wind_direction) %>%
+  mutate(Weather = as.factor(Weather)) %>%
+  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, WindSpeed)
+test <- subset(as.data.frame(sum.data), split == "FALSE") %>%
+  drop_na(Wind_direction) %>%
+  mutate(Weather = as.factor(Weather)) %>%
+  select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, WindSpeed)
+
+set.seed(120)
+classifier_RF = randomForest(x = train[-1], 
+                             y = train$Weather, 
+                             ntree = 500)
+classifier_RF
+plot(classifier_RF)
+
+y_pred = predict(classifier_RF, newdata = test[-1])
+
+confusion_mtx = table(test[,1], y_pred)
+confusion_mtx
+
+importance(classifier_RF)
+
+varImpPlot(classifier_RF)
+```
+
+```{r Random Forest - Whole Model}
+crf <- randomForest(Birds ~ BirdTime + Port + scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + WindSpeed, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
+
+crf
+plot(crf)
+varImpPlot(crf)
 ```
