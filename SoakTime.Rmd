@@ -10,22 +10,15 @@ editor_options:
 ```{r Load packages and Data}
 rm(list = ls())
 library(tidyverse)
-library(rstatix)
-library(ggpubr)
 library(emmeans)
 library(DHARMa)
 library(glmmTMB)
 library(lubridate)
 library(data.table)
 library(doBy)
-library(ggeffects)
-library(FactoMineR)
-library(factoextra)
 library(viridis)
 library(patchwork)
-library(brglm)
-library(scales)
-library(sjPlot)
+library(car)
 
 #Setting up main datasets
 ####Metadata####
@@ -215,7 +208,6 @@ emmeans(mod, list(pairwise ~ Net_treatment), adjust = "bh")
 
 ```{r Catch Rate Model}
 #Check assumptions for Catch weight
-jpeg(filename = "figures/ScaledCatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
 ggplot(sum.data, aes(x = Net_treatment, y = Catch_rate)) +
   scale_colour_manual(values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
@@ -224,7 +216,6 @@ ggplot(sum.data, aes(x = Net_treatment, y = Catch_rate)) +
   scale_x_discrete(labels = c('Control','Reduced Night','Reduced Day')) +
   theme_classic() +
   theme(legend.position = "top")
-dev.off()
 
 #Clearly not normal, does contain 0s so Gamma not an option
 hist(sum.data$Catch_rate)
@@ -323,24 +314,7 @@ dev.off()
 #Summarize and visualize the data
 summaryBy(Birds + Divers + Surface_feeders ~ Bird_time_cat + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
 
-hist(sum.data$Birds)
-
-#Boxplots by time
-ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
-  geom_boxplot(fill = "lightgrey") +
-  scale_colour_manual(values = c("red", "blue")) +
-  xlab("Timing of Haul and Resetting") +
-  ylab("Number of Birds") +
-  geom_jitter(aes(colour = Port)) +
-  theme_classic() +
-  theme(legend.position = "top")
-
-ggplot(data = sum.data, aes(x = Bird_time, y = Birds)) +
-  geom_point(aes(colour = Net_treatment, pch = Port)) +
-  scale_y_continuous(limits = c(10, 3030), breaks = seq(from = 10, to = 3030, by = 500)) +
-  scale_colour_manual(values = c("red", "blue", "black")) +
-  theme_classic()
-
+#Summary figure
 tiff(filename = "figures/Fig5.tif", height = 10, width = 16, units = "cm", res = 300)
 ggplot(data = sum.data, aes(x = Bird_time, y = Birds)) +
   geom_point(aes(colour = Port), size = 2, pch = 21) +
@@ -352,6 +326,16 @@ ggplot(data = sum.data, aes(x = Bird_time, y = Birds)) +
   ylab("Number of Birds")
 dev.off()
 
+#Boxplots by time and treatment
+ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
+  geom_boxplot(fill = "lightgrey") +
+  scale_colour_manual(values = c("red", "blue")) +
+  xlab("Timing of Haul and Resetting") +
+  ylab("Number of Birds") +
+  geom_jitter(aes(colour = Port)) +
+  theme_classic() +
+  theme(legend.position = "top")
+
 ggplot(data = sum.data, aes(x = Net_treatment, y = Birds)) +
   geom_boxplot() +
   theme_classic()
@@ -361,79 +345,4 @@ ggplot(data = sum.data) +
   geom_smooth(aes(x = Bird_time, y = Divers), method = "lm", colour = "black") +
   geom_smooth(aes(x = Bird_time, y = Surface_feeders), method = "lm", colour = "red", fill = "red") +
   theme_classic()
-
-ggplot(data = main.data) +
-  geom_point(aes(x = Bird_time, y = NOGA, colour = Port)) +
-  theme_classic()
-
-#Which weather variables to select
-ggplot() +
-  geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = Wind_speed)) +
-  theme_classic()
-
-bird.data <- sum.data %>% filter(Net_treatment != "24h") %>% drop_na(Bird_time, Wind_speed, Fog)
-
-birdmod1 <- glmmTMB(Birds ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
-                    data = bird.data %>% filter(Net_treatment != "24h"), family = nbinom2(link = "log"))
-
-birdmod <- glmmTMB(Birds ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
-                    data = bird.data, family = nbinom2(link = "log"))
-#Check assumptions
-sim2 <- simulateResiduals(birdmod1, plot = T)
-check_model(birdmod1)
-check_outliers(birdmod1)
-plotResiduals(sim2, form = bird.data$Bird_time)
-plotResiduals(sim2, form = bird.data$Port)
-plotResiduals(sim2, form = bird.data$Wind_speed)
-plotResiduals(sim2, form = bird.data$Fog)
-plotResiduals(sim2, form = bird.data$Scaled_weight)
-performance::check_collinearity(birdmod1)
-
-#Looks good, check model fit
-summary(birdmod1)
-Anova(birdmod1)
-
-#Do the same thing for divers only
-diversmod <- glmmTMB(Divers ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
-                    data = sum.data, family = nbinom2(link = "log"))
-
-sim2.1 <- simulateResiduals(diversmod, plot = T)
-plotResiduals(sim2.1, form = bird.data$Bird_time)
-plotResiduals(sim2.1, form = bird.data$Port)
-plotResiduals(sim2.1, form = bird.data$Wind_speed)
-plotResiduals(sim2.1, form = bird.data$Fog)
-plotResiduals(sim2.1, form = bird.data$Scaled_weight)
-performance::check_collinearity(diversmod)
-
-#Looks good, check model fit
-summary(diversmod)
-Anova(diversmod)
-
-#And the same for surface feeders
-sfmod <- glmmTMB(Surface_feeders ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
-                    data = sum.data, family = nbinom2(link = "log"))
-
-sim2.2 <- simulateResiduals(sfmod, plot = T)
-plotResiduals(sim2.2, form = bird.data$Bird_time)
-plotResiduals(sim2.2, form = bird.data$Port)
-plotResiduals(sim2.2, form = bird.data$Wind_speed)
-plotResiduals(sim2.2, form = bird.data$Fog)
-plotResiduals(sim2.2, form = bird.data$Scaled_weight)
-performance::check_collinearity(sfmod)
-
-#Looks good, check model fit
-summary(sfmod)
-Anova(sfmod)
-
-tiff("figures/Fig_5.tif", width = 16, height = 10, units = "cm", res = 300)
-plot_model(birdmod1, type = "eff", terms = "Bird_time", colors = "black", bias_correction = TRUE) +
-  scale_colour_manual(name = "Port", values = c("red", "blue")) +
-  geom_point(data = sum.data %>% drop_na(Wind_speed), aes(x = Bird_time, y = Birds, colour = Port), pch = 21, cex = 2) +
-  xlab("Time of Hauling (hour of day)") +
-  ylab("Number of Birds") +
-  theme_classic() +
-  guides(color = guide_legend(override.aes = list(fill = NA))) +
-  ggtitle(NULL) +
-  theme(legend.position = "top")
-dev.off()
 ```
