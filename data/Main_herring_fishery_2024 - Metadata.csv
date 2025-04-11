@@ -11,8 +11,10 @@ MH,MH_04,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",2,5/18/2024 18:30:00; 5/18/2024 18:45:00,5/19/2024 6:00:00; 5/19/2024 6:45:00,12_night,Andrew,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,18,SW,"Clear, rough waters",,11,W,"Clear, choppy waters",
 BdV,BdV_03,"48°05.1806, 52°54.0986",1,5/17/2024 7:21,5/18/2024 7:02:00,24h,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,3.5,19,N,"Foggy, slight lop",4,5,N,"Foggy, calm waters",
 BdV,BdV_04,"48°05.1806, 52°54.0986",1,5/18/2024 7:16:00,5/19/2024 6:18:00,24h,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,5,N,"Foggy, calm waters",4,2,N,"Overcast, very calm",
-MH,MH_05,"N49°27.8619', W53°57.2766'
-N49°27.9044', W53°57.4333'",2,5/19/2024 6:45:00; 5/19/2024 7:15:00,5/19/2024 18:15:00; NA,12_day; 24h,Andrew,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,11,W,"Clear, choppy waters",,25,NW,"Cloudy, very rough waters",
+MH,MH_05.a,"N49°27.8619', W53°57.2766'
+N49°27.9044', W53°57.4333'",1,5/19/2024 6:45:00,5/19/2024 18:15:00,12_day,Andrew,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,11,W,"Clear, choppy waters",,25,NW,"Cloudy, very rough waters",
+MH,MH_05.b,"N49°27.8619', W53°57.2766'
+N49°27.9044', W53°57.4333'",1,5/19/2024 7:15:00,,,Andrew,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,11,W,"Clear, choppy waters",,,,,
 BdV,BdV_05,"48°05.1806, 52°54.0986",1,5/19/2024 6:18:00,5/19/2024 15:34:00,12_day,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,2,N,"Overcast, very calm",5,12,,"Overcast, calm waters",wind speed from government of Canada website
 BdV,BdV_06,"48°05.1806, 52°54.0986",1,5/19/2024 15:34:00,5/20/2024 7:11:00,12_night,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,5,,,"Ovecast, calm waters",4,7,E,"0%cc, clear and very calm",
 MH,MH_06.a,"N49°27.8619', W53°57.2766'",1,5/19/2024 18:15:00,5/20/2024 6:15:00,12_night,Andrew,Jessika_Bill,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,25,NW,"Cloudy, very rough waters",,10,N,"Sunny, clear, calm waters",
@@ -26,8 +28,10 @@ BdV,BdV_08,"48.08504°N, 52.90193°W
 48°05.1806, 52°54.0986",2,5/20/2024 16:00; 5/20/2024 16:18,5/21/2024 7:08:00; 5/21/2024 6:09:00,12_night,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,6,11,E,"0%cc, clear and very calm",4,2,ESE,"Very foggy (<200m vis), perfectly calm",
 BdV,BdV_09,"48.08504°N, 52.90193°W
 48°05.1806, 52°54.0986",2,5/21/2024 7:22:00; 5/21/2024 6:49:00,5/21/2024 16:26:00; 5/21/2024 16:10:00,12_day,Tony_Joe,Bobby,Atlantic Herring,10,1.33,"66.80 mm (2 5/8"")",3,,31.0896,199,4,2,ESE,"Very foggy (<200m vis), perfectly calm",9,0,,no cloud no wind very sunny calm waters,
-MH,MH_09,"N49°27.8619', W53°57.2766'
-N49°27.9044', W53°57.4333'",2,5/21/2024 18:15:00; 5/21/2024 18:30:00,5/22/2024 17:15:00; NA,24h,Andrew_Brandon,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,10,NE,"Sunny, clear, calm waters",,20,SE,"Cloudy, very rough waters, big swells and white caps","May 22nd AM: too windy to go on the water, wind will continue to increase all day, next trip May 23rd mid-day at the earliest"
+MH,MH_09.a,"N49°27.8619', W53°57.2766'
+N49°27.9044', W53°57.4333'",1,5/21/2024 18:15:00,5/22/2024 17:15:00,24h,Andrew_Brandon,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,10,NE,"Sunny, clear, calm waters",,20,SE,"Cloudy, very rough waters, big swells and white caps","May 22nd AM: too windy to go on the water, wind will continue to increase all day, next trip May 23rd mid-day at the earliest"
+MH,MH_09.b,"N49°27.8619', W53°57.2766'
+N49°27.9044', W53°57.4333'",1,5/21/2024 18:30:00,,,Andrew_Brandon,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,10,NE,"Sunny, clear, calm waters",,,,,
 MH,MH_10,"N49°27.8619', W53°57.2766'
 N49°27.9044', W53°57.4333'",2,5/22/2024 18:00:00; 5/21/2024 18:30:00,5/23/2024 13:15:00; 5/23/2024 13:30:00,24h,Andrew_Scott,Jessika,Atlantic Herring,12.8,1,"66.80 mm (2 5/8"")",1.5,2.7432,124.358,341.1388656,,20,SE,"Cloudy, very rough waters, big swells and white caps",,12,SE,"Foggy, cloudy, choppy waters",
 MH,MH_11,"N49°27.8619', W53°57.2766'

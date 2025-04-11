@@ -22,6 +22,10 @@ library(tidyverse)
 library(dismo)
 library(beepr)
 library(terra)
+library(FactoMineR)
+library(factoextra)
+library(caTools)
+library(randomForest)
 
 load("data/metadata.Rda")
 load("data/main.data.Rda")
@@ -106,15 +110,13 @@ ggplot() +
 ```
 
 ```{r Random Forest - Weather}
-library(caTools)
-library(randomForest)
-
-split <- sample.split(as.data.frame(sum.data), SplitRatio = 0.7)
-train <- subset(as.data.frame(sum.data), split == "TRUE") %>%
+#Trying a classification random forest based on the MCA weather variable
+split <- sample.split(as.data.frame(metadata), SplitRatio = 0.7)
+train <- subset(as.data.frame(metadata), split == "TRUE") %>%
   drop_na(Wind_direction) %>%
   mutate(Weather = as.factor(Weather)) %>%
   dplyr::select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
-test <- subset(as.data.frame(sum.data), split == "FALSE") %>%
+test <- subset(as.data.frame(metadata), split == "FALSE") %>%
   drop_na(Wind_direction) %>%
   mutate(Weather = as.factor(Weather)) %>%
   select(Weather, Cloud_cover,Fog,Rain,Ocean_cond,Wind_direction, Wind_speed)
@@ -137,6 +139,7 @@ varImpPlot(classifier_RF)
 ```
 
 ```{r Random Forest - Whole Model}
+#Trying a regression random forest for the full model
 crf <- randomForest(Birds ~ Bird_time + Port + Scaled_weight + Cloud_cover + Fog + Rain + Ocean_cond + Wind_direction + Wind_speed + yDate, data = sum.data %>% drop_na(Cloud_cover, Wind_direction))
 
 crf

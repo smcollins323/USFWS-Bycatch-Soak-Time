@@ -25,6 +25,7 @@ library(viridis)
 library(patchwork)
 library(brglm)
 library(scales)
+library(sjPlot)
 
 #Setting up main datasets
 ####Metadata####
@@ -96,7 +97,7 @@ main.data <- read.csv("data/Main_herring_fishery_2024 - Bird_catch_BothSites2.cs
   mutate(Soak_duration = as.numeric(Time_hauling - Time_setting)) %>%
   mutate_at(7:35, as.numeric) %>%
   mutate(Bird_time = as.numeric(as.ITime(Time_hauling))/60/60) %>%
-  mutate(Birds = rowSums(.[17:34])) %>%
+  mutate(Birds = rowSums(.[17:31])) %>%
   mutate(Surface_feeders = rowSums(.[17:23])) %>%
   mutate(Divers = rowSums(.[24:31])) %>%
   mutate(Bycatch_sum = rowSums(.[13:16])) %>%
@@ -159,33 +160,26 @@ save(sum.data, file = "data/sum.data.Rda")
 ```
 
 ```{r Morphometric Summary Stats}
-summaryBy(Sample_herring_wt_g ~ Port, data = morpho.data)
+#Values for S1 Table
+summaryBy(Total_target_catch_number ~ Net_treatment + Port, data = sum.data)
+summaryBy(Total_target_catch_kg ~ Net_treatment + Port, data = sum.data)
 summaryBy(Sample_herring_wt_g ~ Port + Net_treatment, data = morpho.data)
 summaryBy(Sample_herring_FK_cm ~ Port + Net_treatment, data = morpho.data)
 ```
 
 ```{r Summary Stats}
-#Sample Size
-table(sum.data$Net_treatment, sum.data$Port)
-
-#Sample sizes and summary of treatments
+# Table 1 - Sample sizes and summary of treatments
 summaryBy(Soak_duration ~ Net_treatment, data = sum.data, FUN = c(length, mean, sd, min, max))
 
-#Herring Catch summary (Table S1)
-summaryBy(Total_target_catch_number ~ Net_treatment + Port, data = sum.data)
-summaryBy(Total_target_catch_kg ~ Net_treatment + Port, data = sum.data)
-summaryBy(Sample_herring_wt_g ~ Net_treatment + Port, data = morpho.data)
-summaryBy(Sample_herring_FK_cm ~ Net_treatment + Port, data = morpho.data)
-
-#Bird Sightings summary (Table S3)
+#S2 Table - Bird Sightings summary
 summaryBy(NOGA + DCCO + Cormorant_sp + BLGU + ATPU + COMU + RAZO + COEI + BLKI + HERG + GBBG + RBGU + LBBG + ICGU + COTE ~ Port + Bird_time_cat, data = main.data %>% drop_na(16:33), FUN = sum)
 ```
 
 ```{r Catch Model}
 #Check assumptions for Catch weight
-jpeg(filename = "figures/CatchBoxplots.jpeg", width = 16, height = 10, units = "cm", res = 300)
+tiff(filename = "figures/Fig3.tif", width = 16, height = 10, units = "cm", res = 300)
 ggplot(sum.data, aes(x = Net_treatment, y = Scaled_weight)) +
-  scale_colour_manual(values = c("red", "blue")) +
+  scale_colour_manual(name = "Site", values = c("red", "blue")) +
   geom_boxplot(fill = "lightgrey", outliers = FALSE) +
   geom_jitter(aes(colour = Port), pch = 21, size = 2) +
   labs(x = "Soak Treatment", y = bquote("Scaled Target Catch Weight " ~(kg/m^2))) +
@@ -286,7 +280,7 @@ bycatch_box <- ggplot(
   theme_classic() +
   ylab("Bycatch (Number of Individuals)") +
   scale_x_discrete(labels = c('Control', 'Reduced Night', 'Reduced Day')) +
-  scale_colour_manual(values = c("red", "blue")) +
+  scale_colour_manual(name = "Site", values = c("red", "blue")) +
   scale_shape_manual(values = c(2, 1), name = "Species") +
   xlab("Soak Treatment") +
   theme(legend.position = "top")
@@ -311,7 +305,7 @@ bycatchRate_line <- ggplot(
   aes(x = Soak_duration, y = Bycatch_rate)
 ) +
   geom_smooth(method = "loess", colour = "black") +
-  scale_colour_manual(values = c("red", "blue")) +
+  scale_colour_manual(name = "Site", values = c("red", "blue")) +
   scale_shape_manual(values = c(2, 1), name = "Species") +
   geom_point(aes(colour = Port, pch = Bycatch_species), size = 2.5) +
   theme_classic() +
@@ -320,13 +314,18 @@ bycatchRate_line <- ggplot(
   coord_cartesian(ylim = c(0, max(sum.data$Bycatch_rate))) +
   theme(legend.position = "top")
 
-jpeg(filename = "figures/Bycatch.jpeg", width = 16, height = 18, units = "cm", res = 300)
+tiff(filename = "figures/Fig4.tif", width = 16, height = 18, units = "cm", res = 300)
 bycatch_box / bycatchRate_line + plot_annotation(tag_levels = "A") + plot_layout(guides = "collect") & theme(legend.position = "top")
 dev.off()
 ```
 
 ```{r Bird Occurrence Model}
-jpeg(filename = "figures/BirdsBoxplot.jpeg", width = 16, height = 10, units = "cm", res = 300)
+#Summarize and visualize the data
+summaryBy(Birds + Divers + Surface_feeders ~ Bird_time_cat + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
+
+hist(sum.data$Birds)
+
+#Boxplots by time
 ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
   geom_boxplot(fill = "lightgrey") +
   scale_colour_manual(values = c("red", "blue")) +
@@ -335,46 +334,64 @@ ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time_cat, y = Birds)) +
   geom_jitter(aes(colour = Port)) +
   theme_classic() +
   theme(legend.position = "top")
-dev.off()
 
-tiff("figures/Fig_5.tif", width = 16, height = 10, units = "cm", res = 300)
-ggplot(data = sum.data %>% drop_na(Birds), aes(x = Bird_time, y = Birds)) +
-  geom_point(aes(colour = Port)) +
-  geom_smooth() +
-  scale_colour_manual(values = c("red", "blue")) +
-  xlab("Time of Haul and Resetting") +
-  ylab("Number of Birds") +
+ggplot(data = sum.data, aes(x = Bird_time, y = Birds)) +
+  geom_point(aes(colour = Net_treatment, pch = Port)) +
+  scale_y_continuous(limits = c(10, 3030), breaks = seq(from = 10, to = 3030, by = 500)) +
+  scale_colour_manual(values = c("red", "blue", "black")) +
+  theme_classic()
+
+tiff(filename = "figures/Fig5.tif", height = 10, width = 16, units = "cm", res = 300)
+ggplot(data = sum.data, aes(x = Bird_time, y = Birds)) +
+  geom_point(aes(colour = Port), size = 2, pch = 21) +
+  scale_y_continuous(expand = c(0,0,0,0), limits = c(-50, 3100)) +
+  scale_colour_manual(name = "Site", values = c("red", "blue", "black")) +
   theme_classic() +
-  theme(legend.position = "top")
+  theme(legend.position = "top") +
+  xlab("Time of Day") +
+  ylab("Number of Birds")
 dev.off()
 
+ggplot(data = sum.data, aes(x = Net_treatment, y = Birds)) +
+  geom_boxplot() +
+  theme_classic()
+
+#Separate out divers and surface feeders
 ggplot(data = sum.data) +
   geom_smooth(aes(x = Bird_time, y = Divers), method = "lm", colour = "black") +
   geom_smooth(aes(x = Bird_time, y = Surface_feeders), method = "lm", colour = "red", fill = "red") +
   theme_classic()
 
+ggplot(data = main.data) +
+  geom_point(aes(x = Bird_time, y = NOGA, colour = Port)) +
+  theme_classic()
+
+#Which weather variables to select
 ggplot() +
   geom_boxplot(data = sum.data, aes(x = Ocean_cond, y = Wind_speed)) +
   theme_classic()
 
-summaryBy(Birds + Divers + Surface_feeders ~ Bird_time_cat + Port, data = sum.data %>% drop_na(Birds), FUN = c(mean, median, sd, length))
+bird.data <- sum.data %>% filter(Net_treatment != "24h") %>% drop_na(Bird_time, Wind_speed, Fog)
 
-bird.data <- sum.data %>% drop_na(Bird_time, Wind_speed, Fog)
+birdmod1 <- glmmTMB(Birds ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
+                    data = bird.data %>% filter(Net_treatment != "24h"), family = nbinom2(link = "log"))
 
 birdmod <- glmmTMB(Birds ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
                     data = bird.data, family = nbinom2(link = "log"))
 #Check assumptions
-sim2 <- simulateResiduals(birdmod, plot = T)
+sim2 <- simulateResiduals(birdmod1, plot = T)
+check_model(birdmod1)
+check_outliers(birdmod1)
 plotResiduals(sim2, form = bird.data$Bird_time)
 plotResiduals(sim2, form = bird.data$Port)
 plotResiduals(sim2, form = bird.data$Wind_speed)
 plotResiduals(sim2, form = bird.data$Fog)
 plotResiduals(sim2, form = bird.data$Scaled_weight)
-performance::check_collinearity(birdmod)
+performance::check_collinearity(birdmod1)
 
 #Looks good, check model fit
-summary(birdmod)
-Anova(birdmod)
+summary(birdmod1)
+Anova(birdmod1)
 
 #Do the same thing for divers only
 diversmod <- glmmTMB(Divers ~ Bird_time + Port + Wind_speed + Fog + Scaled_weight + (1|yDate), 
@@ -409,7 +426,7 @@ summary(sfmod)
 Anova(sfmod)
 
 tiff("figures/Fig_5.tif", width = 16, height = 10, units = "cm", res = 300)
-plot_model(birdmod, type = "eff", terms = "Bird_time", colors = "black") +
+plot_model(birdmod1, type = "eff", terms = "Bird_time", colors = "black", bias_correction = TRUE) +
   scale_colour_manual(name = "Port", values = c("red", "blue")) +
   geom_point(data = sum.data %>% drop_na(Wind_speed), aes(x = Bird_time, y = Birds, colour = Port), pch = 21, cex = 2) +
   xlab("Time of Hauling (hour of day)") +
