@@ -26,43 +26,55 @@ library(tidyverse)
 library(patchwork)
 library(rgdal)
 library(scales)
-library(legendMap)
+#library(legendMap)
 require(gridExtra)
 require(raster)
 require(grid)
+library(ggspatial)
+library(sf)
 
 Canada <- subset(map_data("world"), map_data("world")$region == "Canada") %>%
   filter(long > -60, lat > 46) %>%
   filter(long < -51, lat < 52.3)
 
-NAFO <- fortify(readOGR("data/NAFO_Divisions_SHP/NAFO_Divisions_2021_line_enclosed.shp")) %>%
-  filter(long > -60, lat > 46) %>%
-  filter(long < -51, lat < 52.3)
+NAFO <- st_read("data/NAFO_Divisions_SHP/NAFO_Divisions_2021_line_enclosed.shp")
+  # filter(long > -60, lat > 46) %>%
+  # filter(long < -51, lat < 52.3)
 
-bathy <- fortify(getNOAA.bathy(lon1 = -51, lon2 = -60, lat1 = 52.3, lat2 = 46, resolution = 1, keep = T)) %>%
-  filter(z < 0) %>%
-  rename(Depth = z)
-bathy <- as.bathy(bathy)
+bathy <- getNOAA.bathy(lon1 = -51, lon2 = -60, lat1 = 52.3, lat2 = 46, resolution = 1, keep = T)
+bat_xyz <- as.xyz(bathy)
+bat_water <- bat_xyz %>% subset(V3 < 0)
 ```
 
 
 ```{r Maps}
 #Main map
-p1 <- autoplot.bathy(bathy, geom = c("raster")) +
+p1 <- ggplot() +
+  geom_tile(data = bat_water, aes(x = V1, y = V2, fill = V3)) +
   scale_fill_gradient2(name = "Depth (m)", low = "dodgerblue4", mid = "gainsboro", high="darkgreen") +
-  geom_polygon(data = NAFO, aes(x = long, y = lat, group = group), colour = "black", fill = NA) +
+  geom_sf(data = NAFO, colour = "black", fill = NA) +
   geom_polygon(data = Canada, aes(x = long, y = lat, group = group), fill = "grey50") +
   annotate("point", cex = 2, y = c(48.086010, 49.447928), x = c(-52.895682, -53.958540), colour = "red") +
   annotate("text", cex = 2.5, y = c(48.086010, 49.447928), x = c(-52.2, -53.0), label = c("Bay de Verde", "Musgrave Harbour")) +
   annotate("text", cex = 3, x = c(-53, -51.8, -55.7), y = c(50, 47.5, 46.5), label = c("3K", "3L", "3Ps")) +
-  theme(panel.background = element_rect(fill = 'white'), legend.key = element_rect(fill = "gainsboro"), text = element_text(size = 12), axis.title=element_blank()) +
-  scale_bar(lon = -54, lat = 46.1, distance_lon = 100, distance_lat = 20, distance_legend = 30, dist_unit = "km", orientation = F)
+  scale_y_continuous(expand = c(0, 0),
+                     name = "Latitude",
+                     limits = c(46, 52.3)) +
+  scale_x_continuous(expand = c(0, 0),
+                     name = "Longitude",
+                     limits = c(-60, -51)) +
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = 'grey50'),
+    text = element_text(size = 12),
+    axis.text = element_text(colour = "black"), 
+    axis.title=element_blank(),
+    legend.margin = margin(0, 0, 0, 0),
+    legend.box.margin = margin(-5, -5, -5, -5)
+  ) +
+  annotation_scale(location = "br", width_hint = 0.3, height = unit(0.5, "cm"), style = "ticks")
 
 p1
-
-# jpeg(filename = "figures/Map.jpeg", width = 15, height = 18, units = "cm", res = 600)
-# dev.off()
-
 ```
 
 ```{r}
@@ -77,7 +89,7 @@ p2 <- ggplot() +
 
 p2
 
-jpeg(filename = "figures/Map2.jpeg", units = "mm", width = 180, height = 150, res = 300)
+tiff(filename = "figures/Fig1.tif", units = "mm", width = 180, height = 150, res = 300)
 grid.newpage()
 v1<-viewport(width = 1, height = 1, x = 0.5, y = 0.5) #plot area for the main map
 v2<-viewport(width = 0.25, height = 0.18, x = 0.65, y = 0.86) #plot area for the inset map
